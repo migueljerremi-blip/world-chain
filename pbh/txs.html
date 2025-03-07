@@ -171,10 +171,6 @@ The `WorldChainTxEnvelope` is an EIP-2718 transaction envelope that extends the 
         nonReentrant
         returns (IMulticall3.Result[] memory returnData)
     {
-        if (gasleft() &gt; pbhGasLimit) {
-            revert GasLimitExceeded(gasleft(), pbhGasLimit);
-        }
-
         uint256 signalHash = abi.encode(msg.sender, calls).hashToField();
         _verifyPbh(signalHash, pbhPayload);
         nullifierHashes[pbhPayload.nullifierHash] = true;
