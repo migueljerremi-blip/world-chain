@@ -75,13 +75,11 @@ mod tests {
     use alloy_sol_types::{sol, SolCall};
     use op_alloy_consensus::OpTypedTransaction;
     use op_revm::OpHaltReason;
+    use op_revm::OpSpecId;
     use op_revm::OpTransactionError;
-    use reth::{
-        chainspec::ChainSpec,
-        rpc::types::{TransactionInput, TransactionRequest},
-    };
+    use reth::rpc::types::{TransactionInput, TransactionRequest};
     use reth_evm::{ConfigureEvm, Evm, EvmEnv};
-    use reth_optimism_chainspec::OpChainSpec;
+    use reth_optimism_chainspec::OpChainSpecBuilder;
     use reth_optimism_node::OpEvmConfig;
     use reth_optimism_primitives::OpTransactionSigned;
     use reth_primitives::Recovered;
@@ -154,10 +152,15 @@ mod tests {
         };
         db.insert_account_info(signer, info);
 
-        let chain_spec = Arc::new(OpChainSpec::new(ChainSpec::default()));
+        let chain_spec = Arc::new(
+            OpChainSpecBuilder::base_mainnet()
+                .ecotone_activated()
+                .build(),
+        );
         let evm_config: OpEvmConfig = OpEvmConfig::new(chain_spec, Default::default());
-
-        let mut evm = evm_config.evm_with_env_and_inspector(db, EvmEnv::default(), pbh_tracer);
+        let mut evm_env = EvmEnv::default();
+        evm_env.cfg_env.spec = OpSpecId::ECOTONE;
+        let mut evm = evm_config.evm_with_env_and_inspector(db, evm_env, pbh_tracer);
         evm.transact_commit(&tx)
     }
 
