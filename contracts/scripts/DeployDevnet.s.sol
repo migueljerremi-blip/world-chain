@@ -51,7 +51,7 @@ contract DeployDevnet is Script {
         deployPBHEntryPoint();
         deployPBHSignatureAggregator();
         // deploySafeAndModules();
-        updateWorldID();
+        // updateWorldID();
         vm.stopBroadcast();
     }
 
