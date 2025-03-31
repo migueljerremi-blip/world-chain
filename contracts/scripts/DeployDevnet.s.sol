@@ -50,7 +50,7 @@ contract DeployDevnet is Script {
         vm.startBroadcast(privateKey);
         deployPBHEntryPoint();
         deployPBHSignatureAggregator();
-        deploySafeAndModules();
+        // deploySafeAndModules();
         updateWorldID();
         vm.stopBroadcast();
     }
@@ -85,90 +85,90 @@ contract DeployDevnet is Script {
         );
     }
 
-    function deploySafeAndModules() public {
-        uint256 ownerKey0 = vm.envUint("SAFE_OWNER_0");
-        uint256 ownerKey1 = vm.envUint("SAFE_OWNER_1");
-        uint256 ownerKey2 = vm.envUint("SAFE_OWNER_2");
-        uint256 ownerKey3 = vm.envUint("SAFE_OWNER_3");
-        uint256 ownerKey4 = vm.envUint("SAFE_OWNER_4");
-        uint256 ownerKey5 = vm.envUint("SAFE_OWNER_5");
+    // function deploySafeAndModules() public {
+    //     uint256 ownerKey0 = vm.envUint("SAFE_OWNER_0");
+    //     uint256 ownerKey1 = vm.envUint("SAFE_OWNER_1");
+    //     uint256 ownerKey2 = vm.envUint("SAFE_OWNER_2");
+    //     uint256 ownerKey3 = vm.envUint("SAFE_OWNER_3");
+    //     uint256 ownerKey4 = vm.envUint("SAFE_OWNER_4");
+    //     uint256 ownerKey5 = vm.envUint("SAFE_OWNER_5");
 
-        uint256[6] memory signers = [
-            ownerKey0,
-            ownerKey1,
-            ownerKey2,
-            ownerKey3,
-            ownerKey4,
-            ownerKey5
-        ];
+    //     uint256[6] memory signers = [
+    //         ownerKey0,
+    //         ownerKey1,
+    //         ownerKey2,
+    //         ownerKey3,
+    //         ownerKey4,
+    //         ownerKey5
+    //     ];
 
-        // Deploy SafeModuleSetup
-        moduleSetup = new SafeModuleSetup();
-        console.log("SafeModuleSetup Deployed at: ", address(moduleSetup));
+    //     // Deploy SafeModuleSetup
+    //     moduleSetup = new SafeModuleSetup();
+    //     console.log("SafeModuleSetup Deployed at: ", address(moduleSetup));
 
-        // Deploy Safe singleton and factory
-        singleton = new Safe();
-        console.log("Safe Singleton Deployed at: ", address(singleton));
+    //     // Deploy Safe singleton and factory
+    //     singleton = new Safe();
+    //     console.log("Safe Singleton Deployed at: ", address(singleton));
 
-        // Deploy SafeProxyFactory
-        factory = new SafeProxyFactory();
-        console.log("SafeProxyFactory Deployed at: ", address(factory));
+    //     // Deploy SafeProxyFactory
+    //     factory = new SafeProxyFactory();
+    //     console.log("SafeProxyFactory Deployed at: ", address(factory));
 
-        for (uint256 i = 0; i < signers.length; i++) {
-            uint256 ownerKey = signers[i];
-            address owner = vm.addr(ownerKey);
-            console.log("Owner Key", ownerKey);
-            console.log("Owner", owner);
-            Mock4337Module module = new Mock4337Module(
-                ENTRY_POINT,
-                pbhSignatureAggregator,
-                PBH_NONCE_KEY
-            );
+    //     for (uint256 i = 0; i < signers.length; i++) {
+    //         uint256 ownerKey = signers[i];
+    //         address owner = vm.addr(ownerKey);
+    //         console.log("Owner Key", ownerKey);
+    //         console.log("Owner", owner);
+    //         Mock4337Module module = new Mock4337Module(
+    //             ENTRY_POINT,
+    //             pbhSignatureAggregator,
+    //             PBH_NONCE_KEY
+    //         );
 
-            console.log("PBH4337Module Deployed at: ", address(module));
-            // Prepare module initialization
-            address[] memory modules = new address[](1);
-            modules[0] = address(module);
+    //         console.log("PBH4337Module Deployed at: ", address(module));
+    //         // Prepare module initialization
+    //         address[] memory modules = new address[](1);
+    //         modules[0] = address(module);
 
-            // Encode the moduleSetup.enableModules call
-            bytes memory moduleSetupCall = abi.encodeCall(
-                SafeModuleSetup.enableModules,
-                (modules)
-            );
+    //         // Encode the moduleSetup.enableModules call
+    //         bytes memory moduleSetupCall = abi.encodeCall(
+    //             SafeModuleSetup.enableModules,
+    //             (modules)
+    //         );
 
-            // Create owners array with single owner
-            address[] memory owners = new address[](1);
-            owners[0] = owner;
+    //         // Create owners array with single owner
+    //         address[] memory owners = new address[](1);
+    //         owners[0] = owner;
 
-            // Encode initialization data for proxy
-            bytes memory initData = abi.encodeCall(
-                Safe.setup,
-                (
-                    owners,
-                    1, // threshold
-                    address(moduleSetup), // to
-                    moduleSetupCall, // data
-                    address(module), // fallbackHandler
-                    address(0), // paymentToken
-                    0, // payment
-                    payable(address(0)) // paymentReceiver
-                )
-            );
+    //         // Encode initialization data for proxy
+    //         bytes memory initData = abi.encodeCall(
+    //             Safe.setup,
+    //             (
+    //                 owners,
+    //                 1, // threshold
+    //                 address(moduleSetup), // to
+    //                 moduleSetupCall, // data
+    //                 address(module), // fallbackHandler
+    //                 address(0), // paymentToken
+    //                 0, // payment
+    //                 payable(address(0)) // paymentReceiver
+    //             )
+    //         );
 
-            // Deploy and initialize Safe proxy
-            SafeProxy proxy = factory.createProxyWithNonce(
-                address(singleton),
-                initData,
-                0 // salt nonce
-            );
+    //         // Deploy and initialize Safe proxy
+    //         SafeProxy proxy = factory.createProxyWithNonce(
+    //             address(singleton),
+    //             initData,
+    //             0 // salt nonce
+    //         );
 
-            // Cast proxy to Safe for easier interaction
-            Safe safe = Safe(payable(address(proxy)));
-            require(safe.isOwner(owner), "Owner not added to Safe");
-            console.log("Safe Proxy Deployed at: ", address(safe));
-            IEntryPoint(ENTRY_POINT).depositTo{value: 1 ether}(address(safe));
-        }
-    }
+    //         // Cast proxy to Safe for easier interaction
+    //         Safe safe = Safe(payable(address(proxy)));
+    //         require(safe.isOwner(owner), "Owner not added to Safe");
+    //         console.log("Safe Proxy Deployed at: ", address(safe));
+    //         IEntryPoint(ENTRY_POINT).depositTo{value: 1 ether}(address(safe));
+    //     }
+    // }
 
     function updateWorldID() public {
         bytes memory data = abi.encodeWithSelector(
