@@ -31,6 +31,8 @@ fn main() {
         Cli::<OpChainSpecParser, WorldChainArgs>::parse().run(|builder, args| async move {
             info!(target: "reth::cli", "Launching node");
 
+            // TODO: handle if flashblocks args
+
             let node = WorldChainNode::new(args.clone());
             let handle = builder
                 .node(node)

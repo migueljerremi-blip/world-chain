@@ -44,7 +44,7 @@ use tracing::{debug, warn};
 
 /// Optimism's payload builder
 #[derive(Debug, Clone)]
-pub struct FlashBlocksPayloadBuilder<Pool, Client, Evm, Txs = ()> {
+pub struct FlashblocksPayloadBuilder<Pool, Client, Evm, Txs = ()> {
     /// The rollup's compute pending block configuration option.
     // TODO(clabby): Implement this feature.
     pub compute_pending_block: bool,
@@ -67,7 +67,7 @@ pub struct FlashBlocksPayloadBuilder<Pool, Client, Evm, Txs = ()> {
     pub flashblock_interval: u64,
 }
 
-impl<Pool, Client, Evm> FlashBlocksPayloadBuilder<Pool, Client, Evm> {
+impl<Pool, Client, Evm> FlashblocksPayloadBuilder<Pool, Client, Evm> {
     pub fn new(
         pool: Pool,
         client: Client,
@@ -107,7 +107,7 @@ impl<Pool, Client, Evm> FlashBlocksPayloadBuilder<Pool, Client, Evm> {
     }
 }
 
-impl<Pool, Client, Evm, Txs> FlashBlocksPayloadBuilder<Pool, Client, Evm, Txs> {
+impl<Pool, Client, Evm, Txs> FlashblocksPayloadBuilder<Pool, Client, Evm, Txs> {
     /// Start the WebSocket server
     pub async fn start_ws(subscribers: Arc<Mutex<Vec<WebSocketStream<TcpStream>>>>, addr: &str) {
         let listener = TcpListener::bind(addr).await.unwrap();
@@ -164,7 +164,7 @@ impl<Pool, Client, Evm, Txs> FlashBlocksPayloadBuilder<Pool, Client, Evm, Txs> {
     }
 }
 
-impl<Pool, Client, Evm, N, T> FlashBlocksPayloadBuilder<Pool, Client, Evm, T>
+impl<Pool, Client, Evm, N, T> FlashblocksPayloadBuilder<Pool, Client, Evm, T>
 where
     Pool: TransactionPool<Transaction: EthPoolTransaction<Consensus = N::SignedTx>>,
     Client: StateProviderFactory + ChainSpecProvider<ChainSpec: EthChainSpec + OpHardforks>,
@@ -223,7 +223,7 @@ where
     }
 }
 
-impl<Pool, Client, Evm, N, Txs> PayloadBuilder for FlashBlocksPayloadBuilder<Pool, Client, Evm, Txs>
+impl<Pool, Client, Evm, N, Txs> PayloadBuilder for FlashblocksPayloadBuilder<Pool, Client, Evm, Txs>
 where
     Client: StateProviderFactory + ChainSpecProvider<ChainSpec: EthChainSpec + OpHardforks> + Clone,
     N: OpPayloadPrimitives,

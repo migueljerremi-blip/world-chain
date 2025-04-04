@@ -8,6 +8,7 @@ use reth::builder::{
     NodeTypesWithEngine,
 };
 
+use flashblocks_payload::builder::FlashblocksPayloadBuilder;
 use reth::transaction_pool::blobstore::DiskFileBlobStore;
 use reth::transaction_pool::TransactionValidationTaskExecutor;
 use reth_optimism_chainspec::OpChainSpec;
@@ -91,7 +92,7 @@ impl WorldChainNode {
             signature_aggregator,
             world_id,
             builder_private_key,
-            flashblock_args,
+            flashblock_args: _,
         } = self.args.clone();
 
         let RollupArgs {
@@ -101,20 +102,6 @@ impl WorldChainNode {
             ..
         } = rollup_args;
 
-        let payload_builder = if flashblock_args.is_some() {
-            // FlashblockPayloadBuilder
-            todo!("flashblocks not yet implemented")
-        } else {
-            WorldChainPayloadBuilder::new(
-                compute_pending_block,
-                verified_blockspace_capacity,
-                pbh_entrypoint,
-                signature_aggregator,
-                builder_private_key.clone(),
-            )
-            .with_da_config(self.da_config.clone())
-        };
-
         ComponentsBuilder::default()
             .node_types::<Node>()
             .pool(WorldChainPoolBuilder::new(
@@ -122,7 +109,16 @@ impl WorldChainNode {
                 signature_aggregator,
                 world_id,
             ))
-            .payload(BasicPayloadServiceBuilder::new(payload_builder))
+            .payload(BasicPayloadServiceBuilder::new(
+                WorldChainPayloadBuilder::new(
+                    compute_pending_block,
+                    verified_blockspace_capacity,
+                    pbh_entrypoint,
+                    signature_aggregator,
+                    builder_private_key.clone(),
+                )
+                .with_da_config(self.da_config.clone()),
+            ))
             .network(OpNetworkBuilder {
                 disable_txpool_gossip,
                 disable_discovery_v4: !discovery_v4,
