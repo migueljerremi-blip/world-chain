@@ -15,6 +15,7 @@ world-chain-builder-payload.workspace = true
 world-chain-builder-pool.workspace = true
 world-chain-builder-test-utils = { workspace = true, optional = true }
 world-chain-builder-pbh = { workspace = true, optional = true }
+flashblocks-payload.workspace = true
 
 reth.workspace = true
 reth-chain-state = { workspace = true, optional = true }
@@ -64,7 +65,7 @@ alloy-signer-local.workspace = true
 alloy-eips.workspace = true
 
 criterion.workspace = true
-semaphore-rs = { workspace = true, features = ["depth_30"]}
+semaphore-rs = { workspace = true, features = ["depth_30"] }
 serde_json.workspace = true
 chrono.workspace = true
 

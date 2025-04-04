@@ -35,4 +35,8 @@ pub struct WorldChainArgs {
     /// used for signing the stampBlock transaction
     #[arg(long = "builder.private_key", env = "BUILDER_PRIVATE_KEY")]
     pub builder_private_key: String,
+
+    /// Enables flashblocks
+    #[arg(long = "builder.flashblocks", default_value = "false")]
+    pub flashblocks: bool,
 }

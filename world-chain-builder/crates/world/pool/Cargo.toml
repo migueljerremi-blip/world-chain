@@ -38,9 +38,12 @@ alloy-rlp.workspace = true
 alloy-network = { workspace = true, optional = true }
 op-alloy-consensus.workspace = true
 
+# flashblocks
+flashblocks-payload.workspace = true
+
 # 3rd party
 tokio.workspace = true
-semaphore-rs = { workspace = true, features = ["depth_30"]}
+semaphore-rs = { workspace = true, features = ["depth_30"] }
 eyre = { workspace = true, optional = true }
 thiserror.workspace = true
 tracing.workspace = true

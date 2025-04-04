@@ -68,6 +68,10 @@ pub struct FlashBlocksPayloadBuilder<Pool, Client, Evm, Txs = ()> {
 }
 
 impl<Pool, Client, Evm, Txs> FlashBlocksPayloadBuilder<Pool, Client, Evm, Txs> {
+    pub fn new() -> Self {
+        todo!()
+    }
+
     /// Start the WebSocket server
     pub async fn start_ws(subscribers: Arc<Mutex<Vec<WebSocketStream<TcpStream>>>>, addr: &str) {
         let listener = TcpListener::bind(addr).await.unwrap();
@@ -398,7 +402,7 @@ impl<Txs> FlashblockBuilder<'_, Txs> {
 // TODO: impl Flashblock for BasicBlock builder
 pub trait Flashblock<N: NodePrimitives> {
     fn finish_flashblock(
-        self,
+        &self,
         state: impl StateProvider,
     ) -> Result<BlockBuilderOutcome<N>, BlockExecutionError>;
 }
