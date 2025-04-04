@@ -20,6 +20,8 @@ members = [
   "crates/tests/sepolia",
   "crates/tests/devnet",
   "crates/flashblocks/payload",
+  "crates/flashblocks/node",
+
 ]
 
 default-members = ["crates/world/bin"]

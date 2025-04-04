@@ -3362,6 +3362,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "flashblocks-node"
+version = "0.1.0"
+dependencies = [
+ "alloy-consensus",
+ "alloy-eips",
+ "alloy-primitives",
+ "alloy-serde 0.7.3",
+ "clap",
+ "reth",
+ "reth-basic-payload-builder",
+ "reth-chain-state",
+ "reth-evm",
+ "reth-optimism-chainspec",
+ "reth-optimism-consensus",
+ "reth-optimism-forks",
+ "reth-optimism-node",
+ "reth-optimism-payload-builder",
+ "reth-optimism-primitives",
+ "reth-payload-util",
+ "reth-primitives",
+ "reth-primitives-traits",
+ "reth-provider",
+ "reth-transaction-pool",
+ "revm",
+ "tokio",
+ "tokio-tungstenite",
+]
+
+[[package]]
 name = "flashblocks-payload"
 version = "0.1.0"
 dependencies = [
