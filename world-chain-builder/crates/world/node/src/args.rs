@@ -1,5 +1,6 @@
 use alloy_primitives::Address;
 use clap::value_parser;
+use flashblocks_node::args::FlashblockArgs;
 use reth_optimism_node::args::RollupArgs;
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, clap::Args)]
@@ -36,7 +37,7 @@ pub struct WorldChainArgs {
     #[arg(long = "builder.private_key", env = "BUILDER_PRIVATE_KEY")]
     pub builder_private_key: String,
 
-    /// Enables flashblocks
-    #[arg(long = "builder.flashblocks", default_value = "false")]
-    pub flashblocks: bool,
+    /// Flashblock args
+    #[command(flatten)]
+    pub flashblock_args: Option<FlashblockArgs>,
 }

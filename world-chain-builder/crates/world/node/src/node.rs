@@ -91,7 +91,7 @@ impl WorldChainNode {
             signature_aggregator,
             world_id,
             builder_private_key,
-            flashblocks,
+            flashblock_args,
         } = self.args.clone();
 
         let RollupArgs {
@@ -101,7 +101,7 @@ impl WorldChainNode {
             ..
         } = rollup_args;
 
-        let payload_builder = if flashblocks {
+        let payload_builder = if flashblock_args.is_some() {
             // FlashblockPayloadBuilder
             todo!("flashblocks not yet implemented")
         } else {

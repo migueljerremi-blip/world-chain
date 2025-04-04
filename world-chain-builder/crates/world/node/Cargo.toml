@@ -16,6 +16,8 @@ world-chain-builder-pool.workspace = true
 world-chain-builder-test-utils = { workspace = true, optional = true }
 world-chain-builder-pbh = { workspace = true, optional = true }
 flashblocks-payload.workspace = true
+flashblocks-node.workspace = true
+
 
 reth.workspace = true
 reth-chain-state = { workspace = true, optional = true }
