@@ -67,11 +67,47 @@ pub struct FlashBlocksPayloadBuilder<Pool, Client, Evm, Txs = ()> {
     pub flashblock_interval: u64,
 }
 
-impl<Pool, Client, Evm, Txs> FlashBlocksPayloadBuilder<Pool, Client, Evm, Txs> {
-    pub fn new() -> Self {
-        todo!()
+impl<Pool, Client, Evm> FlashBlocksPayloadBuilder<Pool, Client, Evm> {
+    pub fn new(
+        pool: Pool,
+        client: Client,
+        evm_config: Evm,
+        block_time: u64,
+        flashblock_interval: u64,
+    ) -> Self {
+        Self::with_builder_config(
+            pool,
+            client,
+            evm_config,
+            Default::default(),
+            block_time,
+            flashblock_interval,
+        )
     }
 
+    pub fn with_builder_config(
+        pool: Pool,
+        client: Client,
+        evm_config: Evm,
+        config: OpBuilderConfig,
+        block_time: u64,
+        flashblock_interval: u64,
+    ) -> Self {
+        Self {
+            pool,
+            client,
+            compute_pending_block: true,
+            evm_config,
+            config,
+            tx: mpsc::unbounded_channel().0,
+            block_time,
+            flashblock_interval,
+            best_transactions: (),
+        }
+    }
+}
+
+impl<Pool, Client, Evm, Txs> FlashBlocksPayloadBuilder<Pool, Client, Evm, Txs> {
     /// Start the WebSocket server
     pub async fn start_ws(subscribers: Arc<Mutex<Vec<WebSocketStream<TcpStream>>>>, addr: &str) {
         let listener = TcpListener::bind(addr).await.unwrap();
