@@ -4,6 +4,7 @@ use reth_node_builder::payload_builder;
 use reth_optimism_cli::chainspec::OpChainSpecParser;
 use reth_optimism_cli::Cli;
 use reth_tracing::tracing::info;
+use world_chain_builder_node::flashblocks::WorldChainFlashblocksNode;
 use world_chain_builder_node::{args::WorldChainArgs, node::WorldChainNode};
 use world_chain_builder_rpc::EthApiExtServer;
 use world_chain_builder_rpc::SequencerClient;
@@ -33,18 +34,10 @@ fn main() {
         Cli::<OpChainSpecParser, WorldChainArgs>::parse().run(|builder, args| async move {
             info!(target: "reth::cli", "Launching node");
 
-            let node = WorldChainNode::new(args.clone());
-
-            if let Some(flashblock_args) = args.flashblock_args {
-                let flashblocks_payload_builder = FlashblocksPayloadBuilder::new(
-                    flashblock_args.block_time,
-                    flashblock_args.interval,
-                    node.components(),
-                );
-
+            if args.flashblock_args.is_some() {
+                let node = WorldChainFlashblocksNode::new(args.clone());
                 let handle = builder
-                    .with_types::<WorldChainNode>()
-                    .with_components(node.components().payload(flashblocks_payload_builder))
+                    .node(node)
                     .extend_rpc_modules(move |ctx| {
                         let provider = ctx.provider().clone();
                         let pool = ctx.pool().clone();
@@ -57,9 +50,9 @@ fn main() {
                     })
                     .launch()
                     .await?;
-
                 handle.node_exit_future.await
             } else {
+                let node = WorldChainNode::new(args.clone());
                 let handle = builder
                     .node(node)
                     .extend_rpc_modules(move |ctx| {
