@@ -9,6 +9,7 @@ use flashblocks_payload::builder::PayloadBuilderCtx;
 use op_alloy_rpc_types::OpTransactionRequest;
 use op_revm::OpContext;
 use reth::api::{PayloadBuilderError, TxTy};
+use reth::chainspec::EthChainSpec;
 use reth::payload::{PayloadBuilderAttributes, PayloadId};
 use reth::revm::database::StateProviderDatabase;
 use reth::revm::witness::ExecutionWitnessRecord;
@@ -26,6 +27,7 @@ use reth_evm::execute::{BlockBuilder, BlockExecutor};
 use reth_evm::Evm;
 use reth_evm::{ConfigureEvm, Database};
 use reth_optimism_chainspec::OpChainSpec;
+use reth_optimism_forks::OpHardforks;
 use reth_optimism_node::{
     OpBuiltPayload, OpEvm, OpEvmConfig, OpNextBlockEnvAttributes, OpPayloadBuilder,
     OpPayloadBuilderAttributes,
@@ -34,7 +36,7 @@ use reth_optimism_payload_builder::builder::{
     ExecutionInfo, OpPayloadBuilderCtx, OpPayloadTransactions,
 };
 use reth_optimism_payload_builder::config::OpBuilderConfig;
-use reth_optimism_payload_builder::OpPayloadAttributes;
+use reth_optimism_payload_builder::{OpPayloadAttributes, OpPayloadPrimitives};
 use reth_optimism_primitives::{OpPrimitives, OpTransactionSigned};
 use reth_payload_util::{NoopPayloadTransactions, PayloadTransactions};
 use reth_primitives::{Block, Recovered, SealedHeader};
@@ -778,23 +780,21 @@ where
     }
 }
 
-impl<Client> PayloadBuilderCtx for WorldChainPayloadBuilderCtx<Client>
+impl<Client, Evm, ChainSpec> PayloadBuilderCtx<Evm, ChainSpec>
+    for WorldChainPayloadBuilderCtx<Client>
 where
     Client: StateProviderFactory
         + BlockReaderIdExt<Block = Block<OpTransactionSigned>>
         + ChainSpecProvider<ChainSpec = OpChainSpec>
         + Clone,
+    Evm: ConfigureEvm<Primitives: OpPayloadPrimitives, NextBlockEnvCtx = OpNextBlockEnvAttributes>,
+    ChainSpec: EthChainSpec + OpHardforks,
 {
-    type Evm = OpEvmConfig;
-    type ChainSpec = OpChainSpec;
-
     fn parent(&self) -> &SealedHeader {
         self.inner.parent()
     }
 
-    fn attributes(
-        &self,
-    ) -> &OpPayloadBuilderAttributes<TxTy<<Self::Evm as ConfigureEvm>::Primitives>> {
+    fn attributes(&self) -> &OpPayloadBuilderAttributes<TxTy<Evm::Primitives>> {
         self.inner.attributes()
     }
 
@@ -818,13 +818,10 @@ where
         self.inner.is_better_payload(total_fees)
     }
 
-    fn block_builder<'a, DB: Database>(
+    fn block_builder<'a, DB>(
         &'a self,
         db: &'a mut State<DB>,
-    ) -> Result<
-        impl BlockBuilder<Primitives = <Self::Evm as ConfigureEvm>::Primitives> + 'a,
-        PayloadBuilderError,
-    >
+    ) -> Result<impl BlockBuilder<Primitives = OpPrimitives> + 'a, PayloadBuilderError>
     where
         DB: Database,
         DB::Error: Send + Sync + 'static,
@@ -834,7 +831,7 @@ where
 
     fn execute_sequencer_transactions(
         &self,
-        builder: &mut impl BlockBuilder<Primitives = <Self::Evm as ConfigureEvm>::Primitives>,
+        builder: &mut impl BlockBuilder<Primitives = OpPrimitives>,
     ) -> Result<ExecutionInfo, PayloadBuilderError> {
         self.inner.execute_sequencer_transactions(builder)
     }
@@ -842,17 +839,13 @@ where
     fn execute_best_transactions<Pool>(
         &self,
         info: &mut ExecutionInfo,
-        builder: &mut impl BlockBuilder<Primitives = <Self::Evm as ConfigureEvm>::Primitives>,
-        best_txs: impl PayloadTransactions<
-            Transaction: PoolTransaction<Consensus = TxTy<<Self::Evm as ConfigureEvm>::Primitives>>,
-        >,
-        _gas_limit: u64,
+        builder: &mut impl BlockBuilder<Primitives = OpPrimitives>,
+        best_txs: impl PayloadTransactions<Transaction: PoolTransaction<Consensus = TxTy<OpPrimitives>>>,
+        gas_limit: u64,
         pool: &Pool,
     ) -> Result<Option<()>, PayloadBuilderError>
     where
-        Pool: TransactionPool<
-            Transaction: PoolTransaction<Consensus = TxTy<<Self::Evm as ConfigureEvm>::Primitives>>,
-        >,
+        Pool: TransactionPool<Transaction: PoolTransaction<Consensus = TxTy<OpPrimitives>>>,
     {
         self.execute_best_transactions(info, builder, best_txs, pool)
     }
