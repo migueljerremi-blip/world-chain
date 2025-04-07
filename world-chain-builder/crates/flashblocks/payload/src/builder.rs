@@ -332,7 +332,7 @@ impl<Txs> FlashblockBuilder<'_, Txs> {
         ChainSpec: EthChainSpec + OpHardforks,
         N: OpPayloadPrimitives,
         Txs: PayloadTransactions<Transaction: PoolTransaction<Consensus = N::SignedTx>>,
-        Ctx: PayloadBuilderCtx<Evm = EvmConfig, ChainSpec = ChainSpec>,
+        Ctx: PayloadBuilderCtx<EvmConfig, ChainSpec>,
         Pool: TransactionPool<
             Transaction: PoolTransaction<Consensus = TxTy<<EvmConfig as ConfigureEvm>::Primitives>>,
         >,
@@ -454,15 +454,14 @@ pub trait Flashblock<N: NodePrimitives> {
     ) -> Result<BlockBuilderOutcome<N>, BlockExecutionError>;
 }
 
-pub trait PayloadBuilderCtx {
-    type Evm: ConfigureEvm;
-    type ChainSpec: EthChainSpec + OpHardforks;
-
+pub trait PayloadBuilderCtx<Evm, ChainSpec>
+where
+    Evm: ConfigureEvm<Primitives: OpPayloadPrimitives, NextBlockEnvCtx = OpNextBlockEnvAttributes>,
+    ChainSpec: EthChainSpec + OpHardforks,
+{
     fn parent(&self) -> &SealedHeader;
 
-    fn attributes(
-        &self,
-    ) -> &OpPayloadBuilderAttributes<TxTy<<Self::Evm as ConfigureEvm>::Primitives>>;
+    fn attributes(&self) -> &OpPayloadBuilderAttributes<TxTy<Evm::Primitives>>;
 
     fn extra_data(&self) -> Result<Bytes, PayloadBuilderError>;
 
@@ -477,50 +476,40 @@ pub trait PayloadBuilderCtx {
     fn block_builder<'a, DB: reth::revm::Database>(
         &'a self,
         db: &'a mut State<DB>,
-    ) -> Result<
-        impl BlockBuilder<Primitives = <Self::Evm as ConfigureEvm>::Primitives> + 'a,
-        PayloadBuilderError,
-    >
+    ) -> Result<impl BlockBuilder<Primitives = Evm::Primitives> + 'a, PayloadBuilderError>
     where
         DB: Database,
         DB::Error: Send + Sync + 'static;
 
     fn execute_sequencer_transactions(
         &self,
-        builder: &mut impl BlockBuilder<Primitives = <Self::Evm as ConfigureEvm>::Primitives>,
+        builder: &mut impl BlockBuilder<Primitives = Evm::Primitives>,
     ) -> Result<ExecutionInfo, PayloadBuilderError>;
 
     fn execute_best_transactions<Pool>(
         &self,
         info: &mut ExecutionInfo,
-        builder: &mut impl BlockBuilder<Primitives = <Self::Evm as ConfigureEvm>::Primitives>,
+        builder: &mut impl BlockBuilder<Primitives = Evm::Primitives>,
         best_txs: impl PayloadTransactions<
-            Transaction: PoolTransaction<Consensus = TxTy<<Self::Evm as ConfigureEvm>::Primitives>>,
+            Transaction: PoolTransaction<Consensus = TxTy<Evm::Primitives>>,
         >,
         gas_limit: u64,
         pool: &Pool,
     ) -> Result<Option<()>, PayloadBuilderError>
     where
-        Pool: TransactionPool<
-            Transaction: PoolTransaction<Consensus = TxTy<<Self::Evm as ConfigureEvm>::Primitives>>,
-        >;
+        Pool: TransactionPool<Transaction: PoolTransaction<Consensus = TxTy<Evm::Primitives>>>;
 }
 
-impl<Evm, Chainspec> PayloadBuilderCtx for OpPayloadBuilderCtx<Evm, Chainspec>
+impl<Evm, ChainSpec> PayloadBuilderCtx<Evm, ChainSpec> for OpPayloadBuilderCtx<Evm, ChainSpec>
 where
     Evm: ConfigureEvm<Primitives: OpPayloadPrimitives, NextBlockEnvCtx = OpNextBlockEnvAttributes>,
-    Chainspec: EthChainSpec + OpHardforks,
+    ChainSpec: EthChainSpec + OpHardforks,
 {
-    type Evm = Evm;
-    type ChainSpec = Chainspec;
-
     fn parent(&self) -> &SealedHeader {
         self.parent()
     }
 
-    fn attributes(
-        &self,
-    ) -> &OpPayloadBuilderAttributes<TxTy<<Self::Evm as ConfigureEvm>::Primitives>> {
+    fn attributes(&self) -> &OpPayloadBuilderAttributes<TxTy<Evm::Primitives>> {
         self.attributes()
     }
 
@@ -547,10 +536,7 @@ where
     fn block_builder<'a, DB: Database>(
         &'a self,
         db: &'a mut State<DB>,
-    ) -> Result<
-        impl BlockBuilder<Primitives = <Self::Evm as ConfigureEvm>::Primitives> + 'a,
-        PayloadBuilderError,
-    >
+    ) -> Result<impl BlockBuilder<Primitives = Evm::Primitives> + 'a, PayloadBuilderError>
     where
         DB: Database,
         DB::Error: Send + Sync + 'static,
@@ -560,7 +546,7 @@ where
 
     fn execute_sequencer_transactions(
         &self,
-        builder: &mut impl BlockBuilder<Primitives = <Self::Evm as ConfigureEvm>::Primitives>,
+        builder: &mut impl BlockBuilder<Primitives = Evm::Primitives>,
     ) -> Result<ExecutionInfo, PayloadBuilderError> {
         self.execute_sequencer_transactions(builder)
     }
@@ -568,9 +554,9 @@ where
     fn execute_best_transactions<Pool>(
         &self,
         info: &mut ExecutionInfo,
-        builder: &mut impl BlockBuilder<Primitives = <Self::Evm as ConfigureEvm>::Primitives>,
+        builder: &mut impl BlockBuilder<Primitives = Evm::Primitives>,
         best_txs: impl PayloadTransactions<
-            Transaction: PoolTransaction<Consensus = TxTy<<Self::Evm as ConfigureEvm>::Primitives>>,
+            Transaction: PoolTransaction<Consensus = TxTy<Evm::Primitives>>,
         >,
         _gas_limit: u64,
         _pool: &Pool,

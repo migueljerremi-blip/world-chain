@@ -576,6 +576,7 @@ where
         TXS: PayloadTransactions<
             Transaction: WorldChainPoolTransaction<Consensus = OpTransactionSigned>,
         >,
+
         Pool: TransactionPool<
             Transaction: WorldChainPoolTransaction<Consensus = OpTransactionSigned>,
         >,
@@ -849,7 +850,9 @@ where
         pool: &Pool,
     ) -> Result<Option<()>, PayloadBuilderError>
     where
-        Pool: TransactionPool<Transaction: PoolTransaction<Consensus = OpTransactionSigned>>,
+        Pool: TransactionPool<
+            Transaction: PoolTransaction<Consensus = TxTy<<Self::Evm as ConfigureEvm>::Primitives>>,
+        >,
     {
         self.execute_best_transactions(info, builder, best_txs, pool)
     }
