@@ -838,7 +838,7 @@ where
         self.inner.execute_sequencer_transactions(builder)
     }
 
-    fn execute_best_transactions(
+    fn execute_best_transactions<Pool>(
         &self,
         info: &mut ExecutionInfo,
         builder: &mut impl BlockBuilder<Primitives = <Self::Evm as ConfigureEvm>::Primitives>,
@@ -846,8 +846,12 @@ where
             Transaction: PoolTransaction<Consensus = TxTy<<Self::Evm as ConfigureEvm>::Primitives>>,
         >,
         _gas_limit: u64,
-    ) -> Result<Option<()>, PayloadBuilderError> {
-        self.execute_best_transactions(info, builder, best_txs)
+        pool: &Pool,
+    ) -> Result<Option<()>, PayloadBuilderError>
+    where
+        Pool: TransactionPool<Transaction: PoolTransaction<Consensus = OpTransactionSigned>>,
+    {
+        self.execute_best_transactions(info, builder, best_txs, pool)
     }
 }
 

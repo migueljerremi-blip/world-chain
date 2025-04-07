@@ -25,6 +25,7 @@ use reth_optimism_payload_builder::{
     config::OpBuilderConfig,
     OpPayloadPrimitives,
 };
+use reth_optimism_primitives::OpTransactionSigned;
 use reth_payload_util::{NoopPayloadTransactions, PayloadTransactions};
 use reth_primitives::{NodePrimitives, SealedHeader, TxTy};
 use reth_provider::{
@@ -214,10 +215,15 @@ where
         let state = StateProviderDatabase::new(&state_provider);
 
         if ctx.attributes().no_tx_pool {
-            builder.build(state, &state_provider, ctx)
+            builder.build(state, &state_provider, ctx, &self.pool)
         } else {
             // sequencer mode we can reuse cachedreads from previous runs
-            builder.build(cached_reads.as_db_mut(state), &state_provider, ctx)
+            builder.build(
+                cached_reads.as_db_mut(state),
+                &state_provider,
+                ctx,
+                &self.pool,
+            )
         }
         .map(|out| out.with_cached_reads(cached_reads))
     }
@@ -314,11 +320,12 @@ impl<'a, Txs> FlashblockBuilder<'a, Txs> {
 
 impl<Txs> FlashblockBuilder<'_, Txs> {
     /// Builds the payload on top of the state.
-    pub fn build<EvmConfig, ChainSpec, N, Ctx>(
+    pub fn build<EvmConfig, ChainSpec, N, Ctx, Pool>(
         self,
         db: impl Database<Error = ProviderError>,
         state_provider: impl StateProvider,
         ctx: Ctx,
+        pool: &Pool,
     ) -> Result<BuildOutcomeKind<OpBuiltPayload<N>>, PayloadBuilderError>
     where
         EvmConfig: ConfigureEvm<Primitives = N, NextBlockEnvCtx = OpNextBlockEnvAttributes>,
@@ -326,6 +333,9 @@ impl<Txs> FlashblockBuilder<'_, Txs> {
         N: OpPayloadPrimitives,
         Txs: PayloadTransactions<Transaction: PoolTransaction<Consensus = N::SignedTx>>,
         Ctx: PayloadBuilderCtx<Evm = EvmConfig, ChainSpec = ChainSpec>,
+        Pool: TransactionPool<
+            Transaction: PoolTransaction<Consensus = TxTy<<EvmConfig as ConfigureEvm>::Primitives>>,
+        >,
     {
         let Self {
             best,
@@ -365,6 +375,7 @@ impl<Txs> FlashblockBuilder<'_, Txs> {
                         &mut builder,
                         best_txs,
                         flashblock_gas_limit,
+                        pool,
                     )?
                     .is_some()
                 {
@@ -488,7 +499,11 @@ pub trait PayloadBuilderCtx {
         >,
         gas_limit: u64,
         pool: &Pool,
-    ) -> Result<Option<()>, PayloadBuilderError>;
+    ) -> Result<Option<()>, PayloadBuilderError>
+    where
+        Pool: TransactionPool<
+            Transaction: PoolTransaction<Consensus = TxTy<<Self::Evm as ConfigureEvm>::Primitives>>,
+        >;
 }
 
 impl<Evm, Chainspec> PayloadBuilderCtx for OpPayloadBuilderCtx<Evm, Chainspec>
@@ -550,7 +565,7 @@ where
         self.execute_sequencer_transactions(builder)
     }
 
-    fn execute_best_transactions(
+    fn execute_best_transactions<Pool>(
         &self,
         info: &mut ExecutionInfo,
         builder: &mut impl BlockBuilder<Primitives = <Self::Evm as ConfigureEvm>::Primitives>,
@@ -558,7 +573,11 @@ where
             Transaction: PoolTransaction<Consensus = TxTy<<Self::Evm as ConfigureEvm>::Primitives>>,
         >,
         _gas_limit: u64,
-    ) -> Result<Option<()>, PayloadBuilderError> {
+        _pool: &Pool,
+    ) -> Result<Option<()>, PayloadBuilderError>
+    where
+        Pool: TransactionPool<Transaction: PoolTransaction<Consensus = TxTy<Evm::Primitives>>>,
+    {
         self.execute_best_transactions(info, builder, best_txs)
     }
 }
