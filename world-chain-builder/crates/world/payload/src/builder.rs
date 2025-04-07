@@ -8,7 +8,7 @@ use eyre::eyre::{eyre, Chain};
 use flashblocks_payload::builder::PayloadBuilderCtx;
 use op_alloy_rpc_types::OpTransactionRequest;
 use op_revm::OpContext;
-use reth::api::{PayloadBuilderError, TxTy};
+use reth::api::PayloadBuilderError;
 use reth::chainspec::EthChainSpec;
 use reth::payload::{PayloadBuilderAttributes, PayloadId};
 use reth::revm::database::StateProviderDatabase;
@@ -39,7 +39,7 @@ use reth_optimism_payload_builder::config::OpBuilderConfig;
 use reth_optimism_payload_builder::{OpPayloadAttributes, OpPayloadPrimitives};
 use reth_optimism_primitives::{OpPrimitives, OpTransactionSigned};
 use reth_payload_util::{NoopPayloadTransactions, PayloadTransactions};
-use reth_primitives::{Block, Recovered, SealedHeader};
+use reth_primitives::{Block, Recovered, SealedHeader, TxTy};
 use reth_primitives_traits::SignedTransaction;
 use reth_provider::{
     BlockReaderIdExt, ChainSpecProvider, ExecutionOutcome, ProviderError, StateProvider,
@@ -490,10 +490,10 @@ impl<Txs> WorldChainBuilder<'_, Txs> {
     }
 
     /// Builds the payload and returns its [`ExecutionWitness`] based on the state after execution.
-    pub fn witness<Pool, Client>(
+    pub fn witness<Pool, Client, Evm, ChainSpec>(
         self,
         state_provider: impl StateProvider,
-        ctx: &WorldChainPayloadBuilderCtx<Client>,
+        ctx: &WorldChainPayloadBuilderCtx<Client, Evm, ChainSpec>,
         pool: &Pool,
     ) -> Result<ExecutionWitness, PayloadBuilderError>
     where
