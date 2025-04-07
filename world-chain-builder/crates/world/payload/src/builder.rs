@@ -543,8 +543,9 @@ impl<Txs> WorldChainBuilder<'_, Txs> {
 
 /// Container type that holds all necessities to build a new payload.
 #[derive(Debug)]
-pub struct WorldChainPayloadBuilderCtx<Client> {
-    pub inner: OpPayloadBuilderCtx<OpEvmConfig, OpChainSpec>,
+
+pub struct WorldChainPayloadBuilderCtx<Client, Evm: ConfigureEvm, ChainSpec> {
+    pub inner: OpPayloadBuilderCtx<Evm, ChainSpec>,
     pub verified_blockspace_capacity: u8,
     pub pbh_entry_point: Address,
     pub pbh_signature_aggregator: Address,
@@ -552,12 +553,14 @@ pub struct WorldChainPayloadBuilderCtx<Client> {
     pub builder_private_key: PrivateKeySigner,
 }
 
-impl<Client> WorldChainPayloadBuilderCtx<Client>
+impl<Client, Evm, ChainSpec> WorldChainPayloadBuilderCtx<Client, Evm, ChainSpec>
 where
     Client: StateProviderFactory
         + BlockReaderIdExt<Block = Block<OpTransactionSigned>>
         + ChainSpecProvider<ChainSpec = OpChainSpec>
         + Clone,
+    Evm: ConfigureEvm<Primitives: OpPayloadPrimitives, NextBlockEnvCtx = OpNextBlockEnvAttributes>,
+    ChainSpec: EthChainSpec + OpHardforks,
 {
     /// Executes the given best transactions and updates the execution info.
     ///
@@ -735,13 +738,7 @@ where
     fn block_builder<'a, DB: Database>(
         &'a self,
         db: &'a mut State<DB>,
-    ) -> Result<
-        impl BlockBuilder<
-            Primitives = OpPrimitives,
-            Executor: BlockExecutor<Evm = OpEvm<&'a mut State<DB>, NoOpInspector>>,
-        >,
-        PayloadBuilderError,
-    > {
+    ) -> Result<impl BlockBuilder<Primitives = Evm::Primitives> + 'a, PayloadBuilderError> {
         // Prepare attributes for next block environment.
         let attributes = OpNextBlockEnvAttributes {
             timestamp: self.inner.attributes().timestamp(),
@@ -781,7 +778,7 @@ where
 }
 
 impl<Client, Evm, ChainSpec> PayloadBuilderCtx<Evm, ChainSpec>
-    for WorldChainPayloadBuilderCtx<Client>
+    for WorldChainPayloadBuilderCtx<Client, Evm, ChainSpec>
 where
     Client: StateProviderFactory
         + BlockReaderIdExt<Block = Block<OpTransactionSigned>>
@@ -795,7 +792,7 @@ where
     }
 
     fn attributes(&self) -> &OpPayloadBuilderAttributes<TxTy<Evm::Primitives>> {
-        self.inner.attributes()
+        todo!()
     }
 
     fn extra_data(&self) -> Result<Bytes, PayloadBuilderError> {
@@ -831,7 +828,7 @@ where
 
     fn execute_sequencer_transactions(
         &self,
-        builder: &mut impl BlockBuilder<Primitives = OpPrimitives>,
+        builder: &mut impl BlockBuilder<Primitives = Evm::Primitives>,
     ) -> Result<ExecutionInfo, PayloadBuilderError> {
         self.inner.execute_sequencer_transactions(builder)
     }
@@ -839,7 +836,7 @@ where
     fn execute_best_transactions<Pool>(
         &self,
         info: &mut ExecutionInfo,
-        builder: &mut impl BlockBuilder<Primitives = OpPrimitives>,
+        builder: &mut impl BlockBuilder<Primitives = Evm::Primitives>,
         best_txs: impl PayloadTransactions<Transaction: PoolTransaction<Consensus = TxTy<OpPrimitives>>>,
         gas_limit: u64,
         pool: &Pool,
