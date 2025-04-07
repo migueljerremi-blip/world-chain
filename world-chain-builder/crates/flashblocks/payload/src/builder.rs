@@ -479,7 +479,7 @@ pub trait PayloadBuilderCtx {
         builder: &mut impl BlockBuilder<Primitives = <Self::Evm as ConfigureEvm>::Primitives>,
     ) -> Result<ExecutionInfo, PayloadBuilderError>;
 
-    fn execute_best_transactions(
+    fn execute_best_transactions<Pool>(
         &self,
         info: &mut ExecutionInfo,
         builder: &mut impl BlockBuilder<Primitives = <Self::Evm as ConfigureEvm>::Primitives>,
@@ -487,6 +487,7 @@ pub trait PayloadBuilderCtx {
             Transaction: PoolTransaction<Consensus = TxTy<<Self::Evm as ConfigureEvm>::Primitives>>,
         >,
         gas_limit: u64,
+        pool: &Pool,
     ) -> Result<Option<()>, PayloadBuilderError>;
 }
 

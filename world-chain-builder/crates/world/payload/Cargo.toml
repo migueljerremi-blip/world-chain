@@ -39,6 +39,7 @@ revm-primitives.workspace = true
 alloy-network.workspace = true
 alloy-signer-local.workspace = true
 alloy-consensus.workspace = true
+alloy-primitives.workspace = true
 alloy-eips.workspace = true
 alloy-rpc-types-debug.workspace = true
 op-alloy-rpc-types.workspace = true

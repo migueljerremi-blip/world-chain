@@ -8,8 +8,8 @@ use eyre::eyre::{eyre, Chain};
 use flashblocks_payload::builder::PayloadBuilderCtx;
 use op_alloy_rpc_types::OpTransactionRequest;
 use op_revm::OpContext;
-use reth::api::PayloadBuilderError;
-use reth::payload::PayloadBuilderAttributes;
+use reth::api::{PayloadBuilderError, TxTy};
+use reth::payload::{PayloadBuilderAttributes, PayloadId};
 use reth::revm::database::StateProviderDatabase;
 use reth::revm::witness::ExecutionWitnessRecord;
 use reth::revm::{DatabaseCommit, State};
@@ -44,9 +44,10 @@ use reth_provider::{
     StateProviderFactory,
 };
 use reth_transaction_pool::{BlobStore, PoolTransaction};
+use revm::context::BlockEnv;
 use revm::inspector::NoOpInspector;
 use revm::Inspector;
-use revm_primitives::{Address, U256};
+use revm_primitives::{Address, Bytes, U256};
 use semaphore_rs::Field;
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -783,37 +784,37 @@ where
         + ChainSpecProvider<ChainSpec = OpChainSpec>
         + Clone,
 {
-    type Evm = Evm;
-    type ChainSpec = Chainspec;
+    type Evm = OpEvmConfig;
+    type ChainSpec = OpChainSpec;
 
     fn parent(&self) -> &SealedHeader {
-        self.parent()
+        self.inner.parent()
     }
 
     fn attributes(
         &self,
     ) -> &OpPayloadBuilderAttributes<TxTy<<Self::Evm as ConfigureEvm>::Primitives>> {
-        self.attributes()
+        self.inner.attributes()
     }
 
     fn extra_data(&self) -> Result<Bytes, PayloadBuilderError> {
-        self.extra_data()
+        self.inner.extra_data()
     }
 
     fn best_transaction_attributes(&self, block_env: &BlockEnv) -> BestTransactionsAttributes {
-        self.best_transaction_attributes(block_env)
+        self.inner.best_transaction_attributes(block_env)
     }
 
     fn payload_id(&self) -> PayloadId {
-        self.payload_id()
+        self.inner.payload_id()
     }
 
     fn is_holocene_active(&self) -> bool {
-        self.is_holocene_active()
+        self.inner.is_holocene_active()
     }
 
     fn is_better_payload(&self, total_fees: U256) -> bool {
-        self.is_better_payload(total_fees)
+        self.inner.is_better_payload(total_fees)
     }
 
     fn block_builder<'a, DB: Database>(
@@ -834,7 +835,7 @@ where
         &self,
         builder: &mut impl BlockBuilder<Primitives = <Self::Evm as ConfigureEvm>::Primitives>,
     ) -> Result<ExecutionInfo, PayloadBuilderError> {
-        self.execute_sequencer_transactions(builder)
+        self.inner.execute_sequencer_transactions(builder)
     }
 
     fn execute_best_transactions(
