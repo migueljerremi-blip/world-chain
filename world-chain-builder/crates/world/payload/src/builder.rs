@@ -298,7 +298,7 @@ where
         let builder: WorldChainBuilder<'_, NoopPayloadTransactions<WorldChainPooledTransaction>> =
             WorldChainBuilder::new(|_| NoopPayloadTransactions::default());
 
-        builder.witness(state_provider, &ctx, &self.inner.pool)
+        builder.witness::<_, _, OpChainSpec>(state_provider, &ctx, &self.inner.pool)
     }
 }
 
@@ -736,7 +736,13 @@ where
     fn block_builder<'a, DB: Database>(
         &'a self,
         db: &'a mut State<DB>,
-    ) -> Result<impl BlockBuilder<Primitives = OpPrimitives> + 'a, PayloadBuilderError> {
+    ) -> Result<
+        impl BlockBuilder<
+                Primitives = OpPrimitives,
+                Executor: BlockExecutor<Evm = OpEvm<&'a mut State<DB>, NoOpInspector>>,
+            > + 'a,
+        PayloadBuilderError,
+    > {
         // Prepare attributes for next block environment.
         let attributes = OpNextBlockEnvAttributes {
             timestamp: self.inner.attributes().timestamp(),
@@ -828,16 +834,18 @@ where
         self.inner.execute_sequencer_transactions(builder)
     }
 
-    fn execute_best_transactions<Pool>(
+    fn execute_best_transactions<Pool, Builder, Txs>(
         &self,
         info: &mut ExecutionInfo,
-        builder: &mut impl BlockBuilder<Primitives = OpPrimitives>,
-        best_txs: impl PayloadTransactions<Transaction: PoolTransaction<Consensus = TxTy<OpPrimitives>>>,
+        builder: &mut Builder,
+        best_txs: Txs,
         gas_limit: u64,
         pool: &Pool,
     ) -> Result<Option<()>, PayloadBuilderError>
     where
-        Pool: TransactionPool<Transaction: PoolTransaction<Consensus = TxTy<OpPrimitives>>>,
+        Pool: TransactionPool<Transaction: PoolTransaction<Consensus = TxTy<Evm::Primitives>>>,
+        Txs: PayloadTransactions<Transaction: PoolTransaction<Consensus = TxTy<Evm::Primitives>>>,
+        Builder: BlockBuilder<Primitives = Evm::Primitives>,
     {
         self.execute_best_transactions(info, builder, best_txs, pool)
     }

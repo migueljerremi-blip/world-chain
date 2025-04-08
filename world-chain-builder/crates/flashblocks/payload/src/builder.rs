@@ -486,18 +486,18 @@ where
         builder: &mut impl BlockBuilder<Primitives = Evm::Primitives>,
     ) -> Result<ExecutionInfo, PayloadBuilderError>;
 
-    fn execute_best_transactions<Pool>(
+    fn execute_best_transactions<Pool, Builder, Txs>(
         &self,
         info: &mut ExecutionInfo,
-        builder: &mut impl BlockBuilder<Primitives = Evm::Primitives>,
-        best_txs: impl PayloadTransactions<
-            Transaction: PoolTransaction<Consensus = TxTy<Evm::Primitives>>,
-        >,
+        builder: &mut Builder,
+        best_txs: Txs,
         gas_limit: u64,
         pool: &Pool,
     ) -> Result<Option<()>, PayloadBuilderError>
     where
-        Pool: TransactionPool<Transaction: PoolTransaction<Consensus = TxTy<Evm::Primitives>>>;
+        Pool: TransactionPool<Transaction: PoolTransaction<Consensus = TxTy<Evm::Primitives>>>,
+        Txs: PayloadTransactions<Transaction: PoolTransaction<Consensus = TxTy<Evm::Primitives>>>,
+        Builder: BlockBuilder<Primitives = Evm::Primitives>;
 }
 
 impl<Evm, ChainSpec> PayloadBuilderCtx<Evm, ChainSpec> for OpPayloadBuilderCtx<Evm, ChainSpec>
