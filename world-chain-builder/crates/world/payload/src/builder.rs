@@ -563,7 +563,7 @@ where
     /// Executes the given best transactions and updates the execution info.
     ///
     /// Returns `Ok(Some(())` if the job was cancelled.
-    pub fn execute_best_transactions<TXS, DB, Builder, Pool>(
+    pub fn execute_best_transactions<TXS, Builder, DB, Pool>(
         &self,
         info: &mut ExecutionInfo,
         builder: &mut Builder,
@@ -843,9 +843,10 @@ where
         pool: &Pool,
     ) -> Result<Option<()>, PayloadBuilderError>
     where
-        Pool: TransactionPool<Transaction: PoolTransaction<Consensus = TxTy<Evm::Primitives>>>,
-        Txs: PayloadTransactions<Transaction: PoolTransaction<Consensus = TxTy<Evm::Primitives>>>,
-        Builder: BlockBuilder<Primitives = Evm::Primitives>,
+        Pool: TransactionPool<Transaction: PoolTransaction<Consensus = TxTy<OpPrimitives>>>,
+        Txs: PayloadTransactions<Transaction: PoolTransaction<Consensus = TxTy<OpPrimitives>>>,
+
+        Builder: BlockBuilder<Primitives = OpPrimitives>,
     {
         self.execute_best_transactions(info, builder, best_txs, pool)
     }

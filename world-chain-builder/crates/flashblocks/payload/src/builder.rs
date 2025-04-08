@@ -551,18 +551,18 @@ where
         self.execute_sequencer_transactions(builder)
     }
 
-    fn execute_best_transactions<Pool>(
+    fn execute_best_transactions<Pool, Builder, Txs>(
         &self,
         info: &mut ExecutionInfo,
-        builder: &mut impl BlockBuilder<Primitives = Evm::Primitives>,
-        best_txs: impl PayloadTransactions<
-            Transaction: PoolTransaction<Consensus = TxTy<Evm::Primitives>>,
-        >,
+        builder: &mut Builder,
+        best_txs: Txs,
         _gas_limit: u64,
         _pool: &Pool,
     ) -> Result<Option<()>, PayloadBuilderError>
     where
         Pool: TransactionPool<Transaction: PoolTransaction<Consensus = TxTy<Evm::Primitives>>>,
+        Txs: PayloadTransactions<Transaction: PoolTransaction<Consensus = TxTy<Evm::Primitives>>>,
+        Builder: BlockBuilder<Primitives = Evm::Primitives>,
     {
         self.execute_best_transactions(info, builder, best_txs)
     }
