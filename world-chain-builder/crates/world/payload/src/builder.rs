@@ -490,10 +490,10 @@ impl<Txs> WorldChainBuilder<'_, Txs> {
     }
 
     /// Builds the payload and returns its [`ExecutionWitness`] based on the state after execution.
-    pub fn witness<Pool, Client, Evm, ChainSpec>(
+    pub fn witness<Pool, Client, ChainSpec>(
         self,
         state_provider: impl StateProvider,
-        ctx: &WorldChainPayloadBuilderCtx<Client, Evm, ChainSpec>,
+        ctx: &WorldChainPayloadBuilderCtx<Client>,
         pool: &Pool,
     ) -> Result<ExecutionWitness, PayloadBuilderError>
     where
@@ -544,8 +544,8 @@ impl<Txs> WorldChainBuilder<'_, Txs> {
 /// Container type that holds all necessities to build a new payload.
 #[derive(Debug)]
 
-pub struct WorldChainPayloadBuilderCtx<Client, Evm: ConfigureEvm, ChainSpec> {
-    pub inner: OpPayloadBuilderCtx<Evm, ChainSpec>,
+pub struct WorldChainPayloadBuilderCtx<Client> {
+    pub inner: OpPayloadBuilderCtx<OpEvmConfig, OpChainSpec>,
     pub verified_blockspace_capacity: u8,
     pub pbh_entry_point: Address,
     pub pbh_signature_aggregator: Address,
@@ -553,14 +553,12 @@ pub struct WorldChainPayloadBuilderCtx<Client, Evm: ConfigureEvm, ChainSpec> {
     pub builder_private_key: PrivateKeySigner,
 }
 
-impl<Client, Evm, ChainSpec> WorldChainPayloadBuilderCtx<Client, Evm, ChainSpec>
+impl<Client> WorldChainPayloadBuilderCtx<Client>
 where
     Client: StateProviderFactory
         + BlockReaderIdExt<Block = Block<OpTransactionSigned>>
         + ChainSpecProvider<ChainSpec = OpChainSpec>
         + Clone,
-    Evm: ConfigureEvm<Primitives: OpPayloadPrimitives, NextBlockEnvCtx = OpNextBlockEnvAttributes>,
-    ChainSpec: EthChainSpec + OpHardforks,
 {
     /// Executes the given best transactions and updates the execution info.
     ///
@@ -738,7 +736,7 @@ where
     fn block_builder<'a, DB: Database>(
         &'a self,
         db: &'a mut State<DB>,
-    ) -> Result<impl BlockBuilder<Primitives = Evm::Primitives> + 'a, PayloadBuilderError> {
+    ) -> Result<impl BlockBuilder<Primitives = OpPrimitives> + 'a, PayloadBuilderError> {
         // Prepare attributes for next block environment.
         let attributes = OpNextBlockEnvAttributes {
             timestamp: self.inner.attributes().timestamp(),
@@ -777,21 +775,18 @@ where
     }
 }
 
-impl<Client, Evm, ChainSpec> PayloadBuilderCtx<Evm, ChainSpec>
-    for WorldChainPayloadBuilderCtx<Client, Evm, ChainSpec>
+impl<Client> PayloadBuilderCtx<OpEvmConfig, OpChainSpec> for WorldChainPayloadBuilderCtx<Client>
 where
     Client: StateProviderFactory
         + BlockReaderIdExt<Block = Block<OpTransactionSigned>>
         + ChainSpecProvider<ChainSpec = OpChainSpec>
         + Clone,
-    Evm: ConfigureEvm<Primitives: OpPayloadPrimitives, NextBlockEnvCtx = OpNextBlockEnvAttributes>,
-    ChainSpec: EthChainSpec + OpHardforks,
 {
     fn parent(&self) -> &SealedHeader {
         self.inner.parent()
     }
 
-    fn attributes(&self) -> &OpPayloadBuilderAttributes<TxTy<Evm::Primitives>> {
+    fn attributes(&self) -> &OpPayloadBuilderAttributes<TxTy<OpPrimitives>> {
         todo!()
     }
 
@@ -828,7 +823,7 @@ where
 
     fn execute_sequencer_transactions(
         &self,
-        builder: &mut impl BlockBuilder<Primitives = Evm::Primitives>,
+        builder: &mut impl BlockBuilder<Primitives = OpPrimitives>,
     ) -> Result<ExecutionInfo, PayloadBuilderError> {
         self.inner.execute_sequencer_transactions(builder)
     }
@@ -836,7 +831,7 @@ where
     fn execute_best_transactions<Pool>(
         &self,
         info: &mut ExecutionInfo,
-        builder: &mut impl BlockBuilder<Primitives = Evm::Primitives>,
+        builder: &mut impl BlockBuilder<Primitives = OpPrimitives>,
         best_txs: impl PayloadTransactions<Transaction: PoolTransaction<Consensus = TxTy<OpPrimitives>>>,
         gas_limit: u64,
         pool: &Pool,
