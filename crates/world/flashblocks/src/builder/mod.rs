@@ -326,7 +326,7 @@ impl<Txs> FlashblockBuilder<'_, Txs> {
         Txs: PayloadTransactions<
             Transaction: MaybeInteropTransaction + PoolTransaction<Consensus = N::SignedTx>,
         >,
-        Ctx: PayloadBuilderCtx<EvmConfig, ChainSpec, Txs = Txs>,
+        Ctx: PayloadBuilderCtx,
         Pool: TransactionPool<Transaction = Txs>,
     {
         debug!(target: "payload_builder", id=%ctx.payload_id(), parent_header = ?ctx.parent().hash(), parent_number = ctx.parent().number, "building new payload");
@@ -552,21 +552,4 @@ impl<Txs> FlashblockBuilder<'_, Txs> {
 
         Ok(fb_payload)
     }
-}
-
-pub fn build_block<Ctx, Evm, Builder, ChainSpec, DB, P>(
-    mut _state: State<DB>,
-    _ctx: &Ctx,
-    _builder: Builder,
-    _info: &mut ExecutionInfo,
-) -> Result<(OpBuiltPayload, FlashblocksPayloadV1, BundleState), PayloadBuilderError>
-where
-    // Ctx: PayloadBuilderCtx<Evm, ChainSpec>,
-    Evm: ConfigureEvm,
-    Builder: BlockBuilder,
-    ChainSpec: EthChainSpec + OpHardforks,
-    DB: Database<Error = ProviderError> + AsRef<P>,
-    P: StateRootProvider + HashedPostStateProvider + StorageRootProvider,
-{
-    todo!()
 }
