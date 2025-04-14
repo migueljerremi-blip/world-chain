@@ -3,10 +3,8 @@ use reth::builder::PayloadBuilderError;
 use reth::{
     chainspec::EthChainSpec,
     payload::PayloadId,
-    revm::{Database, State},
-};
-use reth::{
     revm::primitives::{alloy_primitives::Bloom, B256},
+    revm::{Database, State},
     rpc::types::Withdrawal,
 };
 use reth_evm::{execute::BlockBuilder, ConfigureEvm};
@@ -25,6 +23,7 @@ use reth_transaction_pool::{BestTransactionsAttributes, PoolTransaction, Transac
 use revm::context::BlockEnv;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+
 /// Represents the base configuration of an execution payload that remains constant
 /// throughout block construction. This includes fundamental block properties like
 /// parent hash, block number, and other header fields that are determined at
