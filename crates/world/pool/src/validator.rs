@@ -424,6 +424,40 @@ pub mod tests {
     }
 
     #[tokio::test]
+    async fn validate_pbh_bundle_duplicate_nullifier_hash() {
+        const BUNDLER_ACCOUNT: u32 = 9;
+        const USER_ACCOUNT: u32 = 0;
+
+        let pool = setup().await;
+
+        let (user_op, proof) = user_op()
+            .acc(USER_ACCOUNT)
+            .external_nullifier(ExternalNullifier::with_date_marker(
+                DateMarker::from(chrono::Utc::now()),
+                0,
+            ))
+            .call();
+
+        // Lets add two of the same userOp in the bundle so the nullifier hash is the same and we should expect an error
+        let bundle = pbh_bundle(
+            vec![user_op.clone(), user_op],
+            vec![proof.clone().into(), proof.into()],
+        );
+        let calldata = bundle.abi_encode();
+
+        let tx = eip1559().to(PBH_DEV_ENTRYPOINT).input(calldata).call();
+
+        let tx = eth_tx(BUNDLER_ACCOUNT, tx).await;
+
+        let res = pool
+            .add_external_transaction(tx.clone().into())
+            .await
+            .expect_err("Failed to add transaction");
+
+        assert!(res.to_string().contains("Duplicate nullifier hash"),);
+    }
+
+    #[tokio::test]
     async fn validate_bundle_no_pbh() {
         const USER_ACCOUNT: u32 = 0;
 
