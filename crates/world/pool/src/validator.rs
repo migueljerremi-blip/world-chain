@@ -1,4 +1,5 @@
 //! World Chain transaction pool types
+use std::collections::HashSet;
 use std::sync::atomic::{AtomicU16, AtomicU64, Ordering};
 use std::sync::Arc;
 
@@ -147,6 +148,8 @@ where
 
         // Validate all proofs associated with each UserOp
         let mut aggregated_payloads = vec![];
+        let mut seen_nullifier_hashes = HashSet::new();
+
         for aggregated_ops in calldata._0 {
             let buff = aggregated_ops.signature.as_ref();
             let pbh_payloads = match <Vec<PBHPayload>>::abi_decode(buff) {
@@ -166,7 +169,7 @@ where
 
             let valid_roots = self.root_validator.roots();
 
-            match pbh_payloads
+            let payloads: Vec<PbhPayload> = match pbh_payloads
                 .into_par_iter()
                 .zip(aggregated_ops.userOps)
                 .map(|(payload, op)| {
@@ -179,16 +182,25 @@ where
                         &valid_roots,
                         self.max_pbh_nonce.load(Ordering::Relaxed),
                     )?;
-
                     Ok::<PbhPayload, WorldChainPoolTransactionError>(payload)
                 })
                 .collect::<Result<Vec<PbhPayload>, WorldChainPoolTransactionError>>()
             {
-                Ok(payloads) => {
-                    aggregated_payloads.extend(payloads);
-                }
+                Ok(payloads) => payloads,
                 Err(err) => return err.to_outcome(tx),
+            };
+
+            // Now check for duplicate nullifier_hashes
+            for payload in &payloads {
+                if !seen_nullifier_hashes.insert(payload.nullifier_hash) {
+                    return WorldChainPoolTransactionError::from(
+                        PBHValidationError::DuplicateNullifierHash,
+                    )
+                    .to_outcome(tx);
+                }
             }
+
+            aggregated_payloads.extend(payloads);
         }
 
         if let TransactionValidationOutcome::Valid {
