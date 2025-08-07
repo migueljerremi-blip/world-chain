@@ -21,17 +21,20 @@ use reth_transaction_pool::blobstore::DiskFileBlobStore;
 use reth_trie_db::MerklePatriciaTrie;
 
 use rollup_boost::ed25519_dalek::SigningKey;
+use rollup_boost::Authorization;
 use world_chain_builder_pool::tx::WorldChainPooledTransaction;
 use world_chain_builder_pool::WorldChainTransactionPool;
 
 use crate::args::WorldChainArgs;
-use crate::flashblocks_node::rpc::WorldChainEngineApiBuilder;
+use crate::flashblocks_node::rpc::engine::WorldChainEngineApiBuilder;
+use crate::flashblocks_node::rpc::middlewares::AuthorizationLayer;
 use crate::flashblocks_node::service_builder::FlashblocksPayloadServiceBuilder;
 use crate::node::WorldChainPoolBuilder;
 
 mod payload_builder_builder;
 pub mod rpc;
 pub mod service_builder;
+pub mod add_ons;
 
 /// Type configuration for a regular World Chain node.
 #[derive(Debug, Clone)]
@@ -50,6 +53,10 @@ pub struct WorldChainFlashblocksNode {
     pub flashblocks_handle: FlashblocksHandle,
     /// The flashblocks state.
     pub flashblocks_state: FlashblocksState,
+    /// A watch channel notifier to the jobs generator.
+    pub to_jobs_generator: tokio::sync::watch::Sender<Authorization>,
+    /// A watch channel receiver for ForkChoiceState Authrizations.
+    pub from_forkchoice: tokio::sync::watch::Receiver<Authorization>,
 }
 
 /// A [`ComponentsBuilder`] with its generic arguements set to a stack of World Chain Flashblocks specific builders.
@@ -71,12 +78,16 @@ impl WorldChainFlashblocksNode {
         args: WorldChainArgs,
         flashblocks_handle: FlashblocksHandle,
         flashblocks_state: FlashblocksState,
+        to_jobs_generator: tokio::sync::watch::Sender<Authorization>,
+        from_forkchoice: tokio::sync::watch::Receiver<Authorization>,
     ) -> Self {
         Self {
             args,
             da_config: OpDAConfig::default(),
             flashblocks_handle,
             flashblocks_state,
+            to_jobs_generator,
+            from_forkchoice,
         }
     }
 
@@ -122,6 +133,7 @@ impl WorldChainFlashblocksNode {
                 },
             flashblocks_handle,
             flashblocks_state,
+            from_forkchoice,
             ..
         } = self;
 
@@ -211,6 +223,7 @@ where
         OpEthApiBuilder,
         OpEngineValidatorBuilder,
         WorldChainEngineApiBuilder<OpEngineValidatorBuilder>,
+        AuthorizationLayer,
     >;
 
     fn components_builder(&self) -> Self::ComponentsBuilder {
@@ -220,6 +233,9 @@ where
     fn add_ons(&self) -> Self::AddOns {
         self.add_ons_builder()
             .build::<_, OpEngineValidatorBuilder, WorldChainEngineApiBuilder<OpEngineValidatorBuilder>>()
+            .with_rpc_middleware(AuthorizationLayer::new(
+                self.to_jobs_generator.clone()
+            ))
             .with_engine_api(self.engine_api_builder())
     }
 }

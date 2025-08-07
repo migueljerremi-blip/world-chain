@@ -1,6 +1,6 @@
 //! Utilities for running world chain builder end-to-end tests.
 use crate::args::WorldChainArgs;
-use crate::flashblocks_node::rpc::WorldChainEngineApiBuilder;
+use crate::flashblocks_node::rpc::engine::WorldChainEngineApiBuilder;
 use crate::flashblocks_node::WorldChainFlashblocksNode;
 use alloy_eips::Decodable2718;
 use alloy_network::eip2718::Encodable2718;
