@@ -44,99 +44,102 @@ world-chain-builder-test-utils = { path = "crates/world/test-utils" }
 flashblocks = { path = "crates/world/flashblocks" }
 
 # reth
-reth = { git = "https://github.com/0xOsiris/reth", rev = "1bb4f2c" }
-reth-cli-util = { git = "https://github.com/0xOsiris/reth", rev = "1bb4f2c" }
-reth-cli = { git = "https://github.com/0xOsiris/reth", rev = "1bb4f2c" }
-reth-evm = { git = "https://github.com/0xOsiris/reth", rev = "1bb4f2c", features = [
+reth = { git = "https://github.com/0xOsiris/reth", rev = "b8e439c" }
+reth-cli-util = { git = "https://github.com/0xOsiris/reth", rev = "b8e439c" }
+reth-cli = { git = "https://github.com/0xOsiris/reth", rev = "b8e439c" }
+reth-evm = { git = "https://github.com/0xOsiris/reth", rev = "b8e439c", features = [
     "op",
 ] }
-reth-db = { git = "https://github.com/0xOsiris/reth", rev = "1bb4f2c" }
-reth-db-api = { git = "https://github.com/0xOsiris/reth", rev = "1bb4f2c" }
-reth-provider = { git = "https://github.com/0xOsiris/reth", rev = "1bb4f2c", features = [
+reth-db = { git = "https://github.com/0xOsiris/reth", rev = "b8e439c" }
+reth-db-api = { git = "https://github.com/0xOsiris/reth", rev = "b8e439c" }
+reth-provider = { git = "https://github.com/0xOsiris/reth", rev = "b8e439c", features = [
     "test-utils",
 ] }
-reth-rpc-engine-api = { git = "https://github.com/0xOsiris/reth", rev = "1bb4f2c" }
-reth-basic-payload-builder = { git = "https://github.com/0xOsiris/reth", rev = "1bb4f2c" }
-reth-transaction-pool = { git = "https://github.com/0xOsiris/reth", rev = "1bb4f2c" }
-reth-rpc-server-types = { git = "https://github.com/0xOsiris/reth", rev = "1bb4f2c" }
-reth-prune-types = { git = "https://github.com/0xOsiris/reth", rev = "1bb4f2c" }
-reth-trie = { git = "https://github.com/0xOsiris/reth", rev = "1bb4f2c" }
-reth-chain-state = { git = "https://github.com/0xOsiris/reth", rev = "1bb4f2c" }
-reth-eth-wire-types = { git = "https://github.com/0xOsiris/reth", rev = "1bb4f2c" }
-reth-stages-types = { git = "https://github.com/0xOsiris/reth", rev = "1bb4f2c" }
-reth-trie-db = { git = "https://github.com/0xOsiris/reth", rev = "1bb4f2c" }
-reth-primitives-traits = { git = "https://github.com/0xOsiris/reth", rev = "1bb4f2c" }
-reth-node-builder = { git = "https://github.com/0xOsiris/reth", rev = "1bb4f2c" }
-reth-engine-local = { git = "https://github.com/0xOsiris/reth", rev = "1bb4f2c", features = [
+reth-chain-state = { git = "https://github.com/0xOsiris/reth", rev = "b8e439c" }
+reth-rpc-engine-api = { git = "https://github.com/0xOsiris/reth", rev = "b8e439c" }
+reth-basic-payload-builder = { git = "https://github.com/0xOsiris/reth", rev = "b8e439c" }
+reth-transaction-pool = { git = "https://github.com/0xOsiris/reth", rev = "b8e439c" }
+reth-rpc-server-types = { git = "https://github.com/0xOsiris/reth", rev = "b8e439c" }
+reth-prune-types = { git = "https://github.com/0xOsiris/reth", rev = "b8e439c" }
+reth-trie = { git = "https://github.com/0xOsiris/reth", rev = "b8e439c" }
+reth-eth-wire-types = { git = "https://github.com/0xOsiris/reth", rev = "b8e439c" }
+reth-stages-types = { git = "https://github.com/0xOsiris/reth", rev = "b8e439c" }
+reth-trie-db = { git = "https://github.com/0xOsiris/reth", rev = "b8e439c" }
+reth-primitives-traits = { git = "https://github.com/0xOsiris/reth", rev = "b8e439c" }
+reth-node-builder = { git = "https://github.com/0xOsiris/reth", rev = "b8e439c" }
+reth-engine-local = { git = "https://github.com/0xOsiris/reth", rev = "b8e439c", features = [
     "op",
 ] }
-reth-node-api = { git = "https://github.com/0xOsiris/reth", rev = "1bb4f2c" }
-reth-payload-builder = { git = "https://github.com/0xOsiris/reth", rev = "1bb4f2c" }
-reth-payload-util = { git = "https://github.com/0xOsiris/reth", rev = "1bb4f2c" }
-reth-payload-validator = { git = "https://github.com/0xOsiris/reth", rev = "1bb4f2c" }
-reth-revm = { git = "https://github.com/0xOsiris/reth", rev = "1bb4f2c", default-features = false }
-reth-tasks = { git = "https://github.com/0xOsiris/reth", rev = "1bb4f2c" }
-reth-chainspec = { git = "https://github.com/0xOsiris/reth", rev = "1bb4f2c" }
+reth-metrics = { git = "https://github.com/0xOsiris/reth", rev = "b8e439c" }
+reth-node-api = { git = "https://github.com/0xOsiris/reth", rev = "b8e439c" }
+reth-payload-builder = { git = "https://github.com/0xOsiris/reth", rev = "b8e439c" }
+reth-payload-util = { git = "https://github.com/0xOsiris/reth", rev = "b8e439c" }
+reth-payload-validator = { git = "https://github.com/0xOsiris/reth", rev = "b8e439c" }
+reth-revm = { git = "https://github.com/0xOsiris/reth", rev = "b8e439c", default-features = false }
+reth-tasks = { git = "https://github.com/0xOsiris/reth", rev = "b8e439c" }
+reth-chainspec = { git = "https://github.com/0xOsiris/reth", rev = "b8e439c" }
 
 # reth-optimism
-reth-primitives = { git = "https://github.com/0xOsiris/reth", rev = "1bb4f2c" }
-reth-optimism-evm = { git = "https://github.com/0xOsiris/reth", rev = "1bb4f2c" }
-reth-optimism-node = { git = "https://github.com/0xOsiris/reth", rev = "1bb4f2c" }
-reth-optimism-cli = { git = "https://github.com/0xOsiris/reth", rev = "1bb4f2c" }
-reth-optimism-rpc = { git = "https://github.com/0xOsiris/reth", rev = "1bb4f2c" }
-reth-optimism-consensus = { git = "https://github.com/0xOsiris/reth", rev = "1bb4f2c" }
-reth-optimism-chainspec = { git = "https://github.com/0xOsiris/reth", rev = "1bb4f2c" }
-reth_payload_util = { git = "https://github.com/0xOsiris/reth", rev = "1bb4f2c" }
-reth-optimism-payload-builder = { git = "https://github.com/0xOsiris/reth", rev = "1bb4f2c" }
-reth-optimism-forks = { git = "https://github.com/0xOsiris/reth", rev = "1bb4f2c" }
-reth-optimism-primitives = { git = "https://github.com/0xOsiris/reth", rev = "1bb4f2c" }
-reth-e2e-test-utils = { git = "https://github.com/0xOsiris/reth", rev = "1bb4f2c" }
-reth-consensus = { git = "https://github.com/0xOsiris/reth", rev = "1bb4f2c" }
-reth-node-core = { git = "https://github.com/0xOsiris/reth", rev = "1bb4f2c" }
-reth-tracing = { git = "https://github.com/0xOsiris/reth", rev = "1bb4f2c" }
-reth-rpc-layer = { git = "https://github.com/0xOsiris/reth", rev = "1bb4f2c" }
-reth-node-ethereum = { git = "https://github.com/0xOsiris/reth", rev = "1bb4f2c" }
-reth-optimism-storage = { git = "https://github.com/0xOsiris/reth", rev = "1bb4f2c" }
+reth-primitives = { git = "https://github.com/0xOsiris/reth", rev = "b8e439c" }
+reth-optimism-evm = { git = "https://github.com/0xOsiris/reth", rev = "b8e439c" }
+reth-optimism-node = { git = "https://github.com/0xOsiris/reth", rev = "b8e439c" }
+reth-optimism-cli = { git = "https://github.com/0xOsiris/reth", rev = "b8e439c" }
+reth-optimism-rpc = { git = "https://github.com/0xOsiris/reth", rev = "b8e439c" }
+reth-optimism-consensus = { git = "https://github.com/0xOsiris/reth", rev = "b8e439c" }
+reth-optimism-chainspec = { git = "https://github.com/0xOsiris/reth", rev = "b8e439c" }
+reth_payload_util = { git = "https://github.com/0xOsiris/reth", rev = "b8e439c" }
+reth-optimism-payload-builder = { git = "https://github.com/0xOsiris/reth", rev = "b8e439c" }
+reth-optimism-forks = { git = "https://github.com/0xOsiris/reth", rev = "b8e439c" }
+reth-optimism-primitives = { git = "https://github.com/0xOsiris/reth", rev = "b8e439c" }
+reth-e2e-test-utils = { git = "https://github.com/0xOsiris/reth", rev = "b8e439c" }
+reth-consensus = { git = "https://github.com/0xOsiris/reth", rev = "b8e439c" }
+reth-node-core = { git = "https://github.com/0xOsiris/reth", rev = "b8e439c" }
+reth-tracing = { git = "https://github.com/0xOsiris/reth", rev = "b8e439c" }
+reth-rpc-layer = { git = "https://github.com/0xOsiris/reth", rev = "b8e439c" }
+reth-node-ethereum = { git = "https://github.com/0xOsiris/reth", rev = "b8e439c" }
+reth-optimism-storage = { git = "https://github.com/0xOsiris/reth", rev = "b8e439c" }
 
 # alloy op
-op-alloy-consensus = "0.18.9"
-op-alloy-rpc-types = "0.18.9"
-op-alloy-rpc-types-engine = "0.18.9"
-op-alloy-network = "0.18.9"
-alloy-op-hardforks = "0.2.2"
+op-alloy-consensus = "0.18.13"
+op-alloy-rpc-types = "0.18.13"
+op-alloy-rpc-types-engine = "0.18.13"
+op-alloy-network = "0.18.13"
+alloy-op-hardforks = "0.2.13"
+
 
 # alloy
-alloy = { version = "1.0.18" }
-alloy-json-rpc = { version = "1.0.18", default-features = false }
-alloy-chains = { version = "0.2.0", default-features = false }
-alloy-provider = { version = "1.0.18", default-features = false }
-alloy-rpc-client = { version = "1.0.18", default-features = false }
-alloy-transport-http = { version = "1.0.18", default-features = false }
-alloy-transport = { version = "1.0.18", default-features = false }
-alloy-consensus = { version = "1.0.18", default-features = false }
-alloy-network = { version = "1.0.18", default-features = false }
+alloy = { version = "1.0.23" }
+alloy-json-rpc = { version = "1.0.23", default-features = false }
+alloy-chains = { version = "0.2.5", default-features = false }
+alloy-provider = { version = "1.0.23", default-features = false }
+alloy-rpc-client = { version = "1.0.23", default-features = false }
+alloy-transport-http = { version = "1.0.23", default-features = false }
+alloy-transport = { version = "1.0.23", default-features = false }
+alloy-consensus = { version = "1.0.23", default-features = false }
+alloy-network = { version = "1.0.23", default-features = false }
 alloy-primitives = { version = "1.2.0", default-features = false }
-alloy-rpc-types-eth = { version = "1.0.18", default-features = false }
-alloy-rpc-types = { version = "1.0.18", features = [
+alloy-rpc-types-eth = { version = "1.0.23", default-features = false }
+alloy-rpc-types = { version = "1.0.23", features = [
     "eth",
 ], default-features = false }
-alloy-rpc-types-engine = { version = "1.0.18" }
+alloy-rpc-types-engine = { version = "1.0.23" }
 alloy-rlp = { version = "0.3.10", default-features = false }
-alloy-eips = { version = "1.0.18", default-features = false }
-alloy-genesis = { version = "1.0.18", default-features = false }
-alloy-rpc-types-debug = "1.0.18"
-alloy-signer = { version = "1.0.18", default-features = false }
-alloy-signer-local = { version = "1.0.18", default-features = false }
+alloy-eips = { version = "1.0.23", default-features = false }
+alloy-genesis = { version = "1.0.23", default-features = false }
+alloy-rpc-types-debug = "1.0.23"
+alloy-signer = { version = "1.0.23", default-features = false }
+alloy-signer-local = { version = "1.0.23", default-features = false }
 alloy-sol-types = "1.1.0"
 alloy-serde = { version = "1.0.11", default-features = false }
+alloy-hardforks = "0.2.7"
 
 
 # revm
-revm = { version = "27.0.2", default-features = false }
+revm = { version = "27.0.3", default-features = false }
 revm-state = { version = "*", default-features = false }
 revm-primitives = { version = "20.0.0", default-features = false }
-op-revm = { version = "8.0.2", default-features = false }
-alloy-op-evm = { version = "0.14", default-features = false }
+op-revm = { version = "8.0.3", default-features = false }
+alloy-op-evm = { version = "0.17", default-features = false }
 
 # rpc
 jsonrpsee = { version = "0.25.1", features = ["server", "client", "macros"] }
@@ -144,12 +147,17 @@ jsonrpsee-core = { version = "0.25.1" }
 jsonrpsee-types = "0.25.1"
 
 # 3rd party
-rollup-boost = { git = "https://github.com/flashbots/rollup-boost", rev = "974cc1855b5c20d2e5977b4179a7da1731574604" }
-flashblocks-p2p = { git = "https://github.com/flashbots/rollup-boost", rev = "974cc1855b5c20d2e5977b4179a7da1731574604" }
+rollup-boost = { git = "https://github.com/flashbots/rollup-boost", rev = "2ab9898040a14cece2802655767c68ff876f6573" }
+flashblocks-p2p = { git = "https://github.com/flashbots/rollup-boost", rev = "2ab9898040a14cece2802655767c68ff876f6573" }
+metrics = "*"
+metrics-derive = "*"
 
+schnellru = "0.2.4"
 tokio = { version = "1.44.2", features = ["full"] }
 tokio-util = "0.7.15"
 tokio-tungstenite = "0.26.2"
+tokio-stream = "0.1.11"
+
 futures = "0.3"
 futures-util = "*"
 chrono = "0.4"
@@ -182,8 +190,14 @@ rayon = "1.10.0"
 auto_impl = "1"
 async-trait = "0.1.88"
 tower = "0.5"
+base64 = "*"
 # WIP
-# [patch."https://github.com/0xOsiris/reth"]
+[patch.crates-io]
+jsonrpsee = { git = "https://github.com/0xOsiris/jsonrpsee", rev = "cb9a22f" }
+jsonrpsee-core = { git = "https://github.com/0xOsiris/jsonrpsee", rev = "cb9a22f" }
+jsonrpsee-server = { git = "https://github.com/0xOsiris/jsonrpsee", rev = "cb9a22f" }
+jsonrpsee-types = { git = "https://github.com/0xOsiris/jsonrpsee", rev = "cb9a22f" }
+jsonrpsee-http-client = { git = "https://github.com/0xOsiris/jsonrpsee", rev = "cb9a22f" }
 # reth = { path = "../../paradigmxyz/reth/bin/reth" }
 # reth-cli-util
 # reth-evm

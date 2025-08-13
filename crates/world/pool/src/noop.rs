@@ -4,14 +4,16 @@ use super::tx::WorldChainPooledTransaction;
 use alloy_eips::eip4844::BlobAndProofV1;
 use alloy_primitives::{Address, TxHash, B256};
 use reth::transaction_pool::{
-    error::PoolError, noop::NoopTransactionPool, AllPoolTransactions, AllTransactionsEvents,
-    BestTransactions, BestTransactionsAttributes, BlobStoreError, BlockInfo,
-    GetPooledTransactionLimit, NewBlobSidecar, NewTransactionEvent, PoolResult, PoolSize,
-    PoolTransaction, PropagatedTransactions, TransactionEvents, TransactionListenerKind,
-    TransactionOrigin, TransactionPool, ValidPoolTransaction,
+    error::PoolError, noop::NoopTransactionPool, pool::AddedTransactionState,
+    AddedTransactionOutcome, AllPoolTransactions, AllTransactionsEvents, BestTransactions,
+    BestTransactionsAttributes, BlobStoreError, BlockInfo, GetPooledTransactionLimit,
+    NewBlobSidecar, NewTransactionEvent, PoolResult, PoolSize, PoolTransaction,
+    PropagatedTransactions, TransactionEvents, TransactionListenerKind, TransactionOrigin,
+    TransactionPool, ValidPoolTransaction,
 };
 use reth_eth_wire_types::HandleMempoolData;
 use reth_primitives::Recovered;
+use revm_primitives::FixedBytes;
 use tokio::sync::mpsc::{self, Receiver};
 
 #[derive(Debug, Clone, Default)]
@@ -22,6 +24,10 @@ pub struct NoopWorldChainTransactionPool {
 
 impl TransactionPool for NoopWorldChainTransactionPool {
     type Transaction = WorldChainPooledTransaction;
+
+    fn all_transaction_hashes(&self) -> Vec<TxHash> {
+        vec![]
+    }
 
     fn pending_and_queued_txn_count(&self) -> (usize, usize) {
         (0, 0)
@@ -101,24 +107,20 @@ impl TransactionPool for NoopWorldChainTransactionPool {
     async fn add_transaction(
         &self,
         _origin: TransactionOrigin,
-        transaction: Self::Transaction,
-    ) -> PoolResult<TxHash> {
-        let hash = *transaction.hash();
-        Err(PoolError::other(hash, "noop insertion error"))
+        _transaction: Self::Transaction,
+    ) -> PoolResult<reth::transaction_pool::AddedTransactionOutcome> {
+        Ok(AddedTransactionOutcome {
+            hash: FixedBytes::<32>::default(),
+            state: AddedTransactionState::Pending,
+        })
     }
 
     async fn add_transactions(
         &self,
         _origin: TransactionOrigin,
-        transactions: Vec<Self::Transaction>,
-    ) -> Vec<PoolResult<TxHash>> {
-        transactions
-            .into_iter()
-            .map(|transaction| {
-                let hash = *transaction.hash();
-                Err(PoolError::other(hash, "noop insertion error"))
-            })
-            .collect()
+        _transactions: Vec<Self::Transaction>,
+    ) -> Vec<PoolResult<reth::transaction_pool::AddedTransactionOutcome>> {
+        vec![]
     }
 
     fn transaction_event_listener(&self, _tx_hash: TxHash) -> Option<TransactionEvents> {

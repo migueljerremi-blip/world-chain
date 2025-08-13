@@ -1,27 +1,41 @@
 use std::net::IpAddr;
 
 use alloy_primitives::Address;
+use alloy_rpc_types_engine::{ExecutionPayloadEnvelopeV2, ExecutionPayloadV1};
 use eyre::eyre::Context;
-use flashblocks::builder::FlashblocksPayloadBuilder;
+use flashblocks::builder::{
+    BlockBuilderConfig, FlashblockBuiltPayload, FlashblocksBuilderConfig, FlashblocksPayloadBuilder,
+};
 use flashblocks::rpc::engine::FlashblocksState;
 use flashblocks_p2p::protocol::handler::FlashblocksHandle;
+use op_alloy_consensus::OpTxEnvelope;
+use op_alloy_rpc_types_engine::{
+    OpExecutionData, OpExecutionPayloadEnvelopeV3, OpExecutionPayloadEnvelopeV4,
+};
 use reth::builder::components::PayloadBuilderBuilder;
 use reth::builder::{BuilderContext, FullNodeTypes, NodeTypes};
 use reth::chainspec::EthChainSpec;
+use reth::revm::cancelled::CancelOnDrop;
+use reth_node_api::{EngineTypes, PayloadTypes};
 use reth_optimism_chainspec::OpChainSpec;
 use reth_optimism_forks::OpHardforks;
-use reth_optimism_node::{OpEngineTypes, OpEvmConfig};
+use reth_optimism_node::{
+    OpEngineTypes, OpEvmConfig, OpNodeTypes, OpPayloadAttributes, OpPayloadBuilderAttributes,
+};
 use reth_optimism_payload_builder::builder::OpPayloadTransactions;
 use reth_optimism_payload_builder::config::{OpBuilderConfig, OpDAConfig};
 use reth_optimism_primitives::OpPrimitives;
+use reth_payload_builder::PayloadId;
 use reth_provider::{ChainSpecProvider, StateProviderFactory};
 use reth_transaction_pool::BlobStore;
 use rollup_boost::ed25519_dalek::SigningKey;
-use rollup_boost::FlashblocksPayloadV1;
+use rollup_boost::{Authorization, FlashblocksPayloadV1};
 use tokio::sync::broadcast;
 use world_chain_builder_payload::context::WorldChainPayloadBuilderCtxBuilder;
 use world_chain_builder_pool::tx::WorldChainPooledTransaction;
 use world_chain_builder_pool::WorldChainTransactionPool;
+
+use crate::flashblocks_node::{FlashblocksPayloadTypes, WorldChainFlashblocksNode};
 
 #[derive(Debug, Clone)]
 pub struct FlashblocksPayloadBuilderBuilder<Txs = ()> {
@@ -166,7 +180,23 @@ impl<Txs: OpPayloadTransactions<WorldChainPooledTransaction>>
         >,
     >
     where
-        Node: FullNodeTypes<Types: NodeTypes<ChainSpec = OpChainSpec, Primitives = OpPrimitives>>,
+        Node: FullNodeTypes<
+            Types: OpNodeTypes<
+                Payload: EngineTypes<
+                    BuiltPayload = FlashblockBuiltPayload,
+                    ExecutionData = OpExecutionData,
+                    ExecutionPayloadEnvelopeV1 = ExecutionPayloadV1,
+                    ExecutionPayloadEnvelopeV2 = ExecutionPayloadEnvelopeV2,
+                    ExecutionPayloadEnvelopeV3 = OpExecutionPayloadEnvelopeV3,
+                    ExecutionPayloadEnvelopeV4 = OpExecutionPayloadEnvelopeV4,
+                >,
+                Primitives = OpPrimitives,
+            >,
+        >,
+        <Node as FullNodeTypes>::Provider:
+            StateProviderFactory + ChainSpecProvider<ChainSpec: OpHardforks> + Clone,
+        S: BlobStore + Clone,
+        Txs: OpPayloadTransactions<WorldChainPooledTransaction>,
         S: BlobStore + Clone,
         Txs: OpPayloadTransactions<WorldChainPooledTransaction>,
     {
@@ -174,13 +204,11 @@ impl<Txs: OpPayloadTransactions<WorldChainPooledTransaction>>
             evm_config,
             pool: pool.clone(),
             client: ctx.provider().clone(),
-            // TODO: Allow overriding
-            config: OpBuilderConfig {
-                da_config: self.da_config,
+            config: FlashblocksBuilderConfig {
+                da_config: OpBuilderConfig::default(),
+                block_config: BlockBuilderConfig::default(),
             },
             best_transactions: self.best_transactions.clone(),
-            block_time: self.block_time,
-            flashblock_interval: self.flashblock_interval,
             ctx_builder: WorldChainPayloadBuilderCtxBuilder {
                 client: ctx.provider().clone(),
                 pool,
@@ -192,10 +220,7 @@ impl<Txs: OpPayloadTransactions<WorldChainPooledTransaction>>
                     .parse()
                     .context("Failed to parse builder private key")?,
             },
-            authorizer_sk: self.authorizer_sk,
-            builder_sk: self.builder_sk,
-            p2p_handler: self.p2p_handler.clone(),
-            flashblocks_state: self.flashblocks_state,
+            cancel: CancelOnDrop::default(),
         };
 
         Ok(payload_builder)
@@ -207,14 +232,21 @@ impl<Node, S, Txs>
     for FlashblocksPayloadBuilderBuilder<Txs>
 where
     Node: FullNodeTypes<
-        Types: NodeTypes<
-            Payload = OpEngineTypes,
-            ChainSpec = OpChainSpec,
+        Types: OpNodeTypes<
+            Payload: EngineTypes<
+                BuiltPayload = FlashblockBuiltPayload,
+                ExecutionData = OpExecutionData,
+                ExecutionPayloadEnvelopeV1 = ExecutionPayloadV1,
+                ExecutionPayloadEnvelopeV2 = ExecutionPayloadEnvelopeV2,
+                ExecutionPayloadEnvelopeV3 = OpExecutionPayloadEnvelopeV3,
+                ExecutionPayloadEnvelopeV4 = OpExecutionPayloadEnvelopeV4,
+            >,
             Primitives = OpPrimitives,
+            ChainSpec = OpChainSpec,
         >,
     >,
     <Node as FullNodeTypes>::Provider:
-        StateProviderFactory + ChainSpecProvider<ChainSpec: EthChainSpec + OpHardforks> + Clone,
+        StateProviderFactory + ChainSpecProvider<ChainSpec: OpHardforks> + Clone,
     S: BlobStore + Clone,
     Txs: OpPayloadTransactions<WorldChainPooledTransaction>,
 {

@@ -15,8 +15,6 @@ workspace = true
 world-chain-builder-pool.workspace = true
 world-chain-builder-rpc.workspace = true
 
-flashblocks.workspace = true
-
 # reth
 reth.workspace = true
 reth-basic-payload-builder.workspace = true
@@ -32,7 +30,7 @@ reth-primitives.workspace = true
 reth-transaction-pool.workspace = true
 reth-primitives-traits.workspace = true
 reth-payload-util.workspace = true
-
+flashblocks.workspace = true
 # revm
 revm.workspace = true
 revm-primitives.workspace = true

@@ -1,12 +1,15 @@
 use std::sync::Arc;
 
-use op_alloy_consensus::OpTxEnvelope;
-use reth::revm::cancelled::CancelOnDrop;
+use op_alloy_consensus::{OpBlock, OpTxEnvelope};
+use reth::{api::NodeTypes, revm::cancelled::CancelOnDrop};
 use reth_basic_payload_builder::PayloadConfig;
+use reth_chainspec::EthChainSpec;
 use reth_evm::ConfigureEvm;
+use reth_optimism_forks::OpHardforks;
 use reth_optimism_node::{OpBuiltPayload, OpEvmConfig, OpPayloadBuilderAttributes};
 use reth_optimism_payload_builder::config::OpDAConfig;
 use reth_primitives::NodePrimitives;
+use reth_provider::ChainSpecProvider;
 
 use crate::builder::traits::context::PayloadBuilderCtx;
 
@@ -86,17 +89,21 @@ pub trait PayloadBuilderCtxBuilder<EvmConfig: ConfigureEvm, ChainSpec, Transacti
     /// # Returns
     ///
     /// A configured [`PayloadBuilderCtx`] ready for use in payload building.
-    fn build<Txs>(
+    fn build<
+        N: NodePrimitives<Block = OpBlock>,
+        Client: ChainSpecProvider<ChainSpec: OpHardforks + EthChainSpec>,
+        Txs,
+    >(
         &self,
         evm: EvmConfig,
         da_config: OpDAConfig,
-        chain_spec: Arc<ChainSpec>,
+        chain_spec: Arc<<Client as ChainSpecProvider>::ChainSpec>,
         config: PayloadConfig<
-            OpPayloadBuilderAttributes<OpTxEnvelope>,
-            <<OpEvmConfig as ConfigureEvm>::Primitives as NodePrimitives>::BlockHeader,
+            OpPayloadBuilderAttributes<N::SignedTx>,
+            <N as NodePrimitives>::BlockHeader,
         >,
-        cancel: &CancelOnDrop,
-        best_payload: Option<OpBuiltPayload>,
+        cancel: CancelOnDrop,
+        best_payload: Option<OpBuiltPayload<N>>,
     ) -> Self::PayloadBuilderCtx
     where
         Self: Sized;

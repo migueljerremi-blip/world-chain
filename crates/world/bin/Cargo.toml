@@ -18,6 +18,7 @@ world-chain-builder-chainspec.workspace = true
 
 # rollup-boost
 flashblocks-p2p.workspace = true
+rollup-boost.workspace = true
 
 # reth
 reth-db.workspace = true

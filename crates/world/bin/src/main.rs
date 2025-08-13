@@ -3,6 +3,7 @@ use flashblocks_p2p::protocol::handler::FlashblocksHandle;
 use reth_node_builder::node::Node;
 use reth_optimism_cli::Cli;
 use reth_tracing::tracing::info;
+use rollup_boost::Authorization;
 use tokio::sync::broadcast;
 use world_chain_builder_chainspec::spec::WorldChainChainSpecParser;
 use world_chain_builder_node::flashblocks_node::WorldChainFlashblocksNode;
@@ -51,8 +52,14 @@ fn main() {
                     flashblocks_tx.clone(),
                 );
 
-                let node =
-                    WorldChainFlashblocksNode::new(args.clone(), flashblocks_handle, state.clone());
+                let (to_jobs_generator, _) = tokio::sync::watch::channel(None::<Authorization>);
+
+                let node = WorldChainFlashblocksNode::new(
+                    args.clone(),
+                    flashblocks_handle,
+                    state.clone(),
+                    to_jobs_generator,
+                );
 
                 let handle = builder
                     .with_types::<WorldChainFlashblocksNode>()

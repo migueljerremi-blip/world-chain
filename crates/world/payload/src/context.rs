@@ -7,6 +7,7 @@ use eyre::eyre::eyre;
 use flashblocks::{PayloadBuilderCtx, PayloadBuilderCtxBuilder};
 use op_alloy_rpc_types::OpTransactionRequest;
 use reth::api::PayloadBuilderError;
+use reth::chainspec::EthChainSpec;
 use reth::payload::{PayloadBuilderAttributes, PayloadId};
 use reth::revm::cancelled::CancelOnDrop;
 use reth::revm::State;
@@ -158,6 +159,22 @@ where
         DB::Error: Send + Sync + 'static,
         DB: Database + 'a,
     {
+        let extra_data = if self
+            .inner
+            .chain_spec
+            .is_holocene_active_at_timestamp(self.inner.attributes().timestamp())
+        {
+            self.inner
+                .attributes()
+                .get_holocene_extra_data(
+                    self.inner
+                        .chain_spec
+                        .base_fee_params_at_timestamp(self.inner.attributes().timestamp()),
+                )
+                .map_err(PayloadBuilderError::other)?
+        } else {
+            Default::default()
+        };
         // Prepare attributes for next block environment.
         let attributes = OpNextBlockEnvAttributes {
             timestamp: self.inner.attributes().timestamp(),
@@ -169,7 +186,7 @@ where
                 .gas_limit
                 .unwrap_or(self.inner.parent().gas_limit),
             parent_beacon_block_root: self.inner.attributes().parent_beacon_block_root(),
-            extra_data: self.inner.extra_data()?,
+            extra_data,
         };
 
         // Prepare EVM environment.
@@ -385,7 +402,7 @@ where
             >,
             <<OpEvmConfig as ConfigureEvm>::Primitives as NodePrimitives>::BlockHeader,
         >,
-        cancel: &CancelOnDrop,
+        cancel: CancelOnDrop,
         best_payload: Option<OpBuiltPayload<<OpEvmConfig as ConfigureEvm>::Primitives>>,
     ) -> Self::PayloadBuilderCtx
     where

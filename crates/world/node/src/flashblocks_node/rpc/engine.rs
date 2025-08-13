@@ -10,8 +10,10 @@ use reth::{
     payload::PayloadStore,
     version::{CARGO_PKG_VERSION, CLIENT_CODE, VERGEN_GIT_SHA},
 };
-use reth_node_api::{AddOnsContext, EngineTypes, FullNodeComponents, NodeTypes};
-use reth_node_builder::rpc::{EngineApiBuilder, EngineValidatorBuilder};
+use reth_node_api::{
+    AddOnsContext, EngineApiValidator, EngineTypes, FullNodeComponents, NodeTypes,
+};
+use reth_node_builder::rpc::{EngineApiBuilder, PayloadValidatorBuilder};
 use reth_optimism_node::OP_NAME_CLIENT;
 use reth_optimism_rpc::{OpEngineApi, OP_ENGINE_CAPABILITIES};
 use reth_primitives::EthereumHardforks;
@@ -31,8 +33,8 @@ pub struct WorldChainEngineApiBuilder<EV> {
 
 impl<EV: Default> Default for WorldChainEngineApiBuilder<EV> {
     fn default() -> Self {
-        let (tx, _) = tokio::sync::broadcast::channel(0);
-        let (peer_tx, _) = tokio::sync::broadcast::channel(0);
+        let (tx, _) = tokio::sync::broadcast::channel(10);
+        let (peer_tx, _) = tokio::sync::broadcast::channel(10);
         Self {
             engine_validator_builder: EV::default(),
             flashblocks_handle: FlashblocksHandle {
@@ -57,7 +59,8 @@ where
             Payload: EngineTypes<ExecutionData = OpExecutionData>,
         >,
     >,
-    EV: EngineValidatorBuilder<N>,
+    EV: PayloadValidatorBuilder<N>,
+    EV::Validator: EngineApiValidator<<N::Types as NodeTypes>::Payload>,
 {
     type EngineApi = OpEngineApiExt<
         N::Provider,

@@ -1,26 +1,42 @@
-use flashblocks::rpc::engine::FlashblocksState;
+use alloy_rpc_types_engine::{ExecutionPayloadEnvelopeV2, ExecutionPayloadV1};
+use flashblocks::builder::FlashblockBuiltPayload;
+use flashblocks::rpc::engine::{Flashblocks, FlashblocksState};
 use flashblocks_p2p::net::FlashblocksNetworkBuilder;
 use flashblocks_p2p::protocol::handler::FlashblocksHandle;
+use op_alloy_consensus::OpTxEnvelope;
+use op_alloy_rpc_types_engine::{
+    OpExecutionData, OpExecutionPayloadEnvelopeV3, OpExecutionPayloadEnvelopeV4,
+};
 use payload_builder_builder::FlashblocksPayloadBuilderBuilder;
 use reth::builder::components::ComponentsBuilder;
 use reth::builder::{FullNodeTypes, Node, NodeAdapter, NodeComponentsBuilder, NodeTypes};
 use reth::rpc::compat::RpcTypes;
-use reth_node_builder::components::PayloadServiceBuilder;
+use reth_node_api::{EngineTypes, NodePrimitives, PayloadTypes, PrimitivesTy};
+use reth_node_builder::components::{BasicPayloadServiceBuilder, PayloadServiceBuilder};
+use reth_node_builder::rpc::BasicEngineValidatorBuilder;
 use reth_optimism_chainspec::OpChainSpec;
+use reth_optimism_forks::OpHardforks;
 use reth_optimism_node::args::RollupArgs;
 use reth_optimism_node::node::{
     OpAddOns, OpConsensusBuilder, OpEngineValidatorBuilder, OpExecutorBuilder, OpNetworkBuilder,
     OpNodeTypes,
 };
-use reth_optimism_node::{OpAddOnsBuilder, OpEngineTypes, OpEvmConfig};
+use reth_optimism_node::{
+    OpAddOnsBuilder, OpEngineTypes, OpEvmConfig, OpPayloadAttributes, OpPayloadBuilderAttributes,
+    OpPayloadPrimitives, OpPayloadTypes,
+};
 use reth_optimism_payload_builder::config::OpDAConfig;
-use reth_optimism_primitives::OpPrimitives;
+use reth_optimism_payload_builder::OpAttributes;
+use reth_optimism_primitives::{OpPrimitives, OpTransactionSigned};
 use reth_optimism_rpc::eth::OpEthApiBuilder;
 use reth_optimism_storage::OpStorage;
+use reth_primitives::{Hardforks, SealedBlock, TxTy};
+use reth_primitives_traits::Block;
 use reth_transaction_pool::blobstore::DiskFileBlobStore;
 use reth_trie_db::MerklePatriciaTrie;
-
 use rollup_boost::ed25519_dalek::SigningKey;
+use tower::layer::util::Identity;
+
 use rollup_boost::Authorization;
 use world_chain_builder_pool::tx::WorldChainPooledTransaction;
 use world_chain_builder_pool::WorldChainTransactionPool;
@@ -34,7 +50,6 @@ use crate::node::WorldChainPoolBuilder;
 mod payload_builder_builder;
 pub mod rpc;
 pub mod service_builder;
-pub mod add_ons;
 
 /// Type configuration for a regular World Chain node.
 #[derive(Debug, Clone)]
@@ -54,9 +69,7 @@ pub struct WorldChainFlashblocksNode {
     /// The flashblocks state.
     pub flashblocks_state: FlashblocksState,
     /// A watch channel notifier to the jobs generator.
-    pub to_jobs_generator: tokio::sync::watch::Sender<Authorization>,
-    /// A watch channel receiver for ForkChoiceState Authrizations.
-    pub from_forkchoice: tokio::sync::watch::Receiver<Authorization>,
+    pub to_jobs_generator: tokio::sync::watch::Sender<Option<Authorization>>,
 }
 
 /// A [`ComponentsBuilder`] with its generic arguements set to a stack of World Chain Flashblocks specific builders.
@@ -78,8 +91,7 @@ impl WorldChainFlashblocksNode {
         args: WorldChainArgs,
         flashblocks_handle: FlashblocksHandle,
         flashblocks_state: FlashblocksState,
-        to_jobs_generator: tokio::sync::watch::Sender<Authorization>,
-        from_forkchoice: tokio::sync::watch::Receiver<Authorization>,
+        to_jobs_generator: tokio::sync::watch::Sender<Option<Authorization>>,
     ) -> Self {
         Self {
             args,
@@ -87,7 +99,6 @@ impl WorldChainFlashblocksNode {
             flashblocks_handle,
             flashblocks_state,
             to_jobs_generator,
-            from_forkchoice,
         }
     }
 
@@ -109,7 +120,7 @@ impl WorldChainFlashblocksNode {
     /// Returns the components for the given [`RollupArgs`].
     pub fn components<Node>(&self) -> WorldChainFlashblocksNodeComponentBuilder<Node>
     where
-        Node: FullNodeTypes<Types: OpNodeTypes>,
+        Node: FullNodeTypes<Types = WorldChainFlashblocksNode>,
         FlashblocksPayloadServiceBuilder<FlashblocksPayloadBuilderBuilder>: PayloadServiceBuilder<
             Node,
             WorldChainTransactionPool<
@@ -133,7 +144,6 @@ impl WorldChainFlashblocksNode {
                 },
             flashblocks_handle,
             flashblocks_state,
-            from_forkchoice,
             ..
         } = self;
 
@@ -150,9 +160,7 @@ impl WorldChainFlashblocksNode {
             disable_discovery_v4: !discovery_v4,
         };
 
-        let authorizer_sk = SigningKey::from_bytes(
-            &[10; 32], // TODO: Update this
-        );
+        let authorizer_sk = SigningKey::from_bytes(&[10; 32].into());
 
         let fb_network_builder =
             FlashblocksNetworkBuilder::new(op_network_builder, flashblocks_handle.clone());
@@ -185,9 +193,9 @@ impl WorldChainFlashblocksNode {
                     flashblocks_state.clone(),
                 )
                 .with_da_config(self.da_config.clone()),
-                flashblocks_args.flashblocks_builder_sk.verifying_key(),
-                authorizer_sk,
                 flashblocks_handle.clone(),
+                self.to_jobs_generator.clone(),
+                flashblocks_state.clone(),
             ))
             .network(fb_network_builder)
             .consensus(OpConsensusBuilder::default())
@@ -207,13 +215,15 @@ impl WorldChainFlashblocksNode {
 
 impl<N> Node<N> for WorldChainFlashblocksNode
 where
-    N: FullNodeTypes<
-        Types: NodeTypes<
-            Payload = OpEngineTypes,
-            ChainSpec = OpChainSpec,
-            Primitives = OpPrimitives,
-            Storage = OpStorage,
+    N: FullNodeTypes<Types = EngineTypes<FlashblocksPayloadTypes>>,
+    FlashblocksPayloadServiceBuilder<FlashblocksPayloadBuilderBuilder>: PayloadServiceBuilder<
+        N,
+        WorldChainTransactionPool<
+            <N as FullNodeTypes>::Provider,
+            DiskFileBlobStore,
+            WorldChainPooledTransaction,
         >,
+        OpEvmConfig<<<N as FullNodeTypes>::Types as NodeTypes>::ChainSpec>,
     >,
 {
     type ComponentsBuilder = WorldChainFlashblocksNodeComponentBuilder<N>;
@@ -223,7 +233,9 @@ where
         OpEthApiBuilder,
         OpEngineValidatorBuilder,
         WorldChainEngineApiBuilder<OpEngineValidatorBuilder>,
-        AuthorizationLayer,
+        BasicEngineValidatorBuilder<OpEngineValidatorBuilder>,
+        Identiy,
+        Identiy,
     >;
 
     fn components_builder(&self) -> Self::ComponentsBuilder {
@@ -231,12 +243,29 @@ where
     }
 
     fn add_ons(&self) -> Self::AddOns {
-        self.add_ons_builder()
-            .build::<_, OpEngineValidatorBuilder, WorldChainEngineApiBuilder<OpEngineValidatorBuilder>>()
-            .with_rpc_middleware(AuthorizationLayer::new(
-                self.to_jobs_generator.clone()
-            ))
-            .with_engine_api(self.engine_api_builder())
+        OpAddOns::default().with_engine_api(self.engine_api_builder())
+        // .with_tower_middleware(AuthorizationLayer::new(self.to_jobs_generator.clone()))
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct FlashblocksPayloadTypes;
+
+impl PayloadTypes for FlashblocksPayloadTypes {
+    type BuiltPayload = FlashblockBuiltPayload;
+    type ExecutionData = OpExecutionData;
+    type PayloadAttributes = OpPayloadAttributes;
+    type PayloadBuilderAttributes = OpPayloadBuilderAttributes<OpTxEnvelope>;
+
+    fn block_to_payload(
+        block: reth_primitives_traits::SealedBlock<
+                <<Self::BuiltPayload as reth_node_api::BuiltPayload>::Primitives as reth_node_api::NodePrimitives>::Block,
+            >,
+    ) -> Self::ExecutionData {
+        OpExecutionData::from_block_unchecked(
+            block.hash(),
+            &block.into_block().into_ethereum_block(),
+        )
     }
 }
 

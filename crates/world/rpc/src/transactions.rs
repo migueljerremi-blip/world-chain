@@ -72,10 +72,10 @@ where
         if let Some(client) = self.raw_tx_forwarder().as_ref() {
             tracing::debug!( target: "rpc::eth",  "forwarding raw conditional transaction to");
             let _ = client.forward_raw_transaction_conditional(&tx, options).await.inspect_err(|err| {
-                        tracing::debug!(target: "rpc::eth", %err, hash=?*hash, "failed to forward raw conditional transaction");
+                        tracing::debug!(target: "rpc::eth", %err, hash=?*hash.hash, "failed to forward raw conditional transaction");
                     });
         }
-        Ok(hash)
+        Ok(hash.hash)
     }
 
     async fn send_raw_transaction(&self, tx: Bytes) -> Result<B256, Self::Error> {
@@ -93,10 +93,10 @@ where
         if let Some(client) = self.raw_tx_forwarder().as_ref() {
             tracing::debug!( target: "rpc::eth",  "forwarding raw transaction to sequencer");
             let _ = client.forward_raw_transaction(&tx).await.inspect_err(|err| {
-                        tracing::debug!(target: "rpc::eth", %err, hash=?*hash, "failed to forward raw transaction");
+                        tracing::debug!(target: "rpc::eth", %err, hash=?*hash.hash, "failed to forward raw transaction");
                     });
         }
-        Ok(hash)
+        Ok(hash.hash)
     }
 }
 

@@ -1,37 +1,72 @@
 //! Utilities for running world chain builder end-to-end tests.
 use crate::args::WorldChainArgs;
 use crate::flashblocks_node::rpc::engine::WorldChainEngineApiBuilder;
+use crate::flashblocks_node::rpc::middlewares::{
+    AuthorizationLayer, FLASHBLOCKS_AUTHORIZATION_HEADER,
+};
 use crate::flashblocks_node::WorldChainFlashblocksNode;
-use alloy_eips::Decodable2718;
+use alloy_eips::{BlockNumberOrTag, Decodable2718, HashOrNumber};
 use alloy_network::eip2718::Encodable2718;
-use alloy_primitives::{Bytes, TxHash};
+use alloy_primitives::{Bytes, TxHash, B64};
+use alloy_provider::{Provider, ProviderBuilder};
+use alloy_rlp::Encodable;
+use alloy_rpc_client::{ReqwestClient, RpcClient, RpcClientInner};
+use alloy_rpc_types_engine::{JwtSecret, PayloadAttributes, PayloadId};
+use alloy_sol_types::sol_data::FixedBytes;
+use alloy_transport_http::{Client, Http};
+use base64::engine::general_purpose::PAD;
+use base64::engine::GeneralPurpose;
+use base64::prelude::{BASE64_STANDARD, BASE64_STANDARD_NO_PAD};
+use base64::{alphabet, engine, Engine};
+use clap::builder;
 use flashblocks::args::FlashblocksArgs;
 use flashblocks::rpc::engine::FlashblocksState;
 use flashblocks_p2p::protocol::handler::FlashblocksHandle;
 use futures_util::StreamExt;
+use jsonrpsee::async_client::ClientBuilder;
+use jsonrpsee::core::client::SubscriptionClientT;
+use jsonrpsee::http_client::HttpClient;
+use jsonrpsee::ws_client::{HeaderMap, HeaderValue, WsClient};
 use op_alloy_consensus::OpTxEnvelope;
 use reth::api::TreeConfig;
 use reth::args::PayloadBuilderArgs;
 use reth::builder::Node;
 use reth::builder::{EngineNodeLauncher, NodeBuilder, NodeConfig, NodeHandle};
+use reth::network::p2p::headers;
 use reth::tasks::TaskManager;
-use reth_e2e_test_utils::node::NodeTestContext;
+use reth_chain_state::ForkChoiceNotifications;
+use reth_e2e_test_utils::node::{self, NodeTestContext};
 use reth_e2e_test_utils::transaction::TransactionTestContext;
+use reth_e2e_test_utils::TmpDB;
+use reth_node_api::NodeTypesWithDBAdapter;
 use reth_node_core::args::RpcServerArgs;
 use reth_optimism_chainspec::OpChainSpec;
+use reth_optimism_node::args::RollupArgs;
 use reth_optimism_node::utils::optimism_payload_attributes;
-use reth_optimism_node::{OpAddOns, OpEngineValidatorBuilder};
+use reth_optimism_node::{
+    OpAddOns, OpEngineValidatorBuilder, OpPayloadAttributes, OpPayloadBuilderAttributes,
+};
+use reth_optimism_payload_builder::payload_id_optimism;
+use reth_optimism_primitives::OpTransactionSigned;
 use reth_provider::providers::BlockchainProvider;
-use revm_primitives::Address;
-use rollup_boost::ed25519_dalek::SigningKey;
-use rollup_boost::FlashblocksPayloadV1;
+use reth_provider::BlockReader;
+use reth_rpc_layer::{secret_to_bearer_header, AuthClientLayer, Claims, JwtAuthValidator};
+use revm_primitives::{Address, B256};
+use rollup_boost::ed25519_dalek::{SigningKey, VerifyingKey};
+use rollup_boost::{AuthLayer, Authorization, EngineApiClient, FlashblocksPayloadV1};
+use std::borrow::Cow;
 use std::collections::HashSet;
+use std::io::Read;
 use std::net::{IpAddr, Ipv4Addr};
 use std::ops::Range;
+use std::path::PathBuf;
+use std::str::FromStr;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 use tokio::sync::RwLock;
-use tracing::span;
+use tokio_tungstenite::tungstenite::http::header::AUTHORIZATION;
+use tower::ServiceBuilder;
+use tracing::{info, span};
 use world_chain_builder_rpc::{EthApiExtServer, WorldChainEthApiExt};
 use world_chain_builder_test_utils::utils::signer;
 use world_chain_builder_test_utils::{
@@ -47,9 +82,16 @@ pub async fn setup_flashblocks(
     num_nodes: u8,
 ) -> eyre::Result<(
     Range<u8>,
-    Vec<WorldChainNode<WorldChainFlashblocksNode>>,
+    Vec<
+        WorldChainNode<
+            WorldChainFlashblocksNode,
+            BlockchainProvider<NodeTypesWithDBAdapter<WorldChainFlashblocksNode, TmpDB>>,
+        >,
+    >,
     TaskManager,
     Vec<FlashblocksHandle>,
+    SigningKey,
+    Vec<VerifyingKey>,
 )> {
     std::env::set_var("PRIVATE_KEY", DEV_WORLD_ID.to_string());
     let op_chain_spec = Arc::new(get_chain_spec());
@@ -76,15 +118,25 @@ pub async fn setup_flashblocks(
     // discv5 ports seem to be clashing
     node_config.network.discovery.disable_discovery = true;
     node_config.network.discovery.addr = [127, 0, 0, 1].into();
+    let secret = alloy_primitives::FixedBytes::<32>::from(Address::random().into_word());
+
+    node_config.rpc.auth_jwtsecret =
+        Some(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src/tests/assets/jwt.hex"));
 
     // is 0.0.0.0 by default
     node_config.network.addr = [127, 0, 0, 1].into();
 
-    let mut nodes =
-        Vec::<WorldChainNode<WorldChainFlashblocksNode>>::with_capacity(num_nodes as usize);
+    let mut nodes = Vec::<
+        WorldChainNode<
+            WorldChainFlashblocksNode,
+            BlockchainProvider<NodeTypesWithDBAdapter<WorldChainFlashblocksNode, TmpDB>>,
+        >,
+    >::with_capacity(num_nodes as usize);
 
     let mut flashblocks_handles = Vec::with_capacity(num_nodes as usize);
+    let authorizer_vk = SigningKey::from_bytes(&[10; 32]);
 
+    let mut builder_signers = Vec::with_capacity(num_nodes as usize);
     for idx in 0..3 {
         let span = span!(tracing::Level::INFO, "test_node", idx);
         let _enter = span.enter();
@@ -96,9 +148,10 @@ pub async fn setup_flashblocks(
             flashblocks_authorizor_vk: None,
             flashblocks_builder_sk: SigningKey::from_bytes(&[idx; 32]),
         };
+
+        builder_signers.push(flashblocks_args.flashblocks_builder_sk.verifying_key());
         let (flashblocks_tx, _) = tokio::sync::broadcast::channel(100);
 
-        let authorizer_vk = SigningKey::from_bytes(&[10; 32]);
         let flashblocks_handle = FlashblocksHandle::new(
             authorizer_vk.verifying_key(),
             flashblocks_args.flashblocks_builder_sk.clone(),
@@ -113,6 +166,8 @@ pub async fn setup_flashblocks(
             flashblocks_state: flashblocks_state.clone(),
         };
 
+        let (tx, rx) = tokio::sync::watch::channel(None::<Authorization>);
+
         let node = WorldChainFlashblocksNode::new(
             WorldChainArgs {
                 verified_blockspace_capacity: 70,
@@ -121,10 +176,12 @@ pub async fn setup_flashblocks(
                 world_id: DEV_WORLD_ID,
                 builder_private_key: signer(6).to_bytes().to_string(),
                 flashblocks_args: Some(flashblocks_args),
+
                 ..Default::default()
             },
             flashblocks_handle.clone(),
             flashblocks_state,
+            tx.clone(),
         );
 
         let NodeHandle {
@@ -134,7 +191,7 @@ pub async fn setup_flashblocks(
             .testing_node(exec.clone())
             .with_types_and_provider::<WorldChainFlashblocksNode, BlockchainProvider<_>>()
             .with_components(node.components_builder())
-            .with_add_ons(OpAddOns::default().with_engine_api(engine_builder))
+            .with_add_ons(node.add_ons())
             .extend_rpc_modules(move |ctx| {
                 let provider = ctx.provider().clone();
                 let pool = ctx.pool().clone();
@@ -170,13 +227,21 @@ pub async fn setup_flashblocks(
         nodes.push(node);
         flashblocks_handles.push(flashblocks_handle);
     }
-    Ok((0..6, nodes, tasks, flashblocks_handles))
+    Ok((
+        0..6,
+        nodes,
+        tasks,
+        flashblocks_handles,
+        authorizer_vk,
+        builder_signers,
+    ))
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_flashblocks() -> eyre::Result<()> {
     reth_tracing::init_test_tracing();
-    let (_signers, mut nodes, _task_manager, p2p_handles) = setup_flashblocks(3).await?;
+    let (_signers, mut nodes, _task_manager, p2p_handles, authorizer_vk, builder_signers) =
+        setup_flashblocks(3).await?;
 
     // fetch the first node
     let node: &mut WorldChainNode<WorldChainFlashblocksNode> = nodes
@@ -307,7 +372,8 @@ async fn test_flashblocks() -> eyre::Result<()> {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_flashblocks_failover() -> eyre::Result<()> {
     reth_tracing::init_test_tracing();
-    let (_signers, mut nodes, _task_manager, p2p_handles) = setup_flashblocks(3).await?;
+    let (_signers, mut nodes, _task_manager, p2p_handles, authorizer_vk, builder_signers) =
+        setup_flashblocks(3).await?;
 
     let messages_node_0 = Arc::new(RwLock::new(Vec::<FlashblocksPayloadV1>::new()));
     let messages_node_1 = Arc::new(RwLock::new(Vec::<FlashblocksPayloadV1>::new()));
@@ -415,6 +481,161 @@ async fn test_flashblocks_failover() -> eyre::Result<()> {
         payloads_node_0, payloads_node_1,
         "Both nodes should have received the same flashblocks payloads"
     );
+
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_flashblocks_authorization() -> eyre::Result<()> {
+    reth_tracing::init_test_tracing();
+    let (_signers, mut nodes, _task_manager, p2p_handles, authorizer_vk, builder_signers) =
+        setup_flashblocks(3).await?;
+
+    let messages_node_0 = Arc::new(RwLock::new(Vec::<FlashblocksPayloadV1>::new()));
+    let messages_node_1 = Arc::new(RwLock::new(Vec::<FlashblocksPayloadV1>::new()));
+
+    let messages_clone_node_0: Arc<RwLock<Vec<FlashblocksPayloadV1>>> = messages_node_0.clone();
+    let messages_clone_node_1: Arc<RwLock<Vec<FlashblocksPayloadV1>>> = messages_node_1.clone();
+
+    let _handle = tokio::spawn(async move {
+        let flashblocks_handle_0 = p2p_handles
+            .first()
+            .expect("At least one p2p handle should be present")
+            .clone();
+
+        let flashblocks_handle_1 = p2p_handles
+            .get(1)
+            .expect("At least two p2p handles should be present")
+            .clone();
+
+        let fut_0 = async move {
+            let mut stream = flashblocks_handle_0.flashblock_stream();
+            while let Some(message) = stream.next().await {
+                messages_clone_node_0.write().await.push(message);
+            }
+        };
+
+        let fut_1 = async move {
+            let mut stream = flashblocks_handle_1.flashblock_stream();
+            while let Some(message) = stream.next().await {
+                messages_clone_node_1.write().await.push(message);
+            }
+        };
+
+        tokio::join!(fut_0, fut_1);
+    });
+
+    // insert 10 transactions into the pool of the first node
+    for i in 0..10 {
+        let raw_tx = tx(BASE_CHAIN_ID, None, i, Address::random(), 21_000);
+        let signed = TransactionTestContext::sign_tx(signer(0), raw_tx).await; // use a new signer for each transaction
+        nodes[0].rpc.inject_tx(signed.encoded_2718().into()).await?;
+    }
+
+    // insert 10 transactions into the pool of the second node
+    for i in 0..10 {
+        let raw_tx = tx(BASE_CHAIN_ID, None, i + 10, Address::random(), 21_000);
+        let signed = TransactionTestContext::sign_tx(signer(1), raw_tx).await; // use a new signer for each transaction
+        nodes[1].rpc.inject_tx(signed.encoded_2718().into()).await?;
+    }
+
+    let auth_handle = nodes[0].auth_server_handle();
+
+    let payload_attributes: OpPayloadBuilderAttributes<OpTransactionSigned> =
+        optimism_payload_attributes(
+            SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .expect("Time went backwards")
+                .as_secs(),
+        );
+
+    let secret = std::fs::read_to_string(
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src/tests/assets/jwt.hex"),
+    )
+    .expect("Failed to read JWT secret file");
+
+    let jwt = JwtSecret::from_str(&secret).expect("Failed to parse JWT secret");
+    let authorization = Authorization::new(
+        payload_attributes.payload_id(),
+        0,
+        &authorizer_vk,
+        builder_signers[0].clone(),
+    );
+    let mut buff = Vec::new();
+    authorization.encode(&mut buff);
+    println!("{:?}", buff);
+    let mut headers = HeaderMap::new();
+    headers.insert(AUTHORIZATION, secret_to_bearer_header(&jwt));
+
+    headers.insert(
+        FLASHBLOCKS_AUTHORIZATION_HEADER,
+        HeaderValue::from_str(&BASE64_STANDARD_NO_PAD.encode::<&[u8]>(buff.as_ref()))
+            .expect("Failed to set header value"),
+    );
+
+    // Create the reqwest::Client with the AUTHORIZATION header.
+    let client_with_auth = Client::builder().default_headers(headers).build()?;
+
+    // Create the HTTP transport.
+    let rpc_url = auth_handle.local_addr().to_string();
+    let http = Http::with_client(
+        client_with_auth,
+        format!("http://{}", rpc_url).parse().expect("Invalid URL"),
+    );
+
+    let rpc_client = RpcClient::new(http, false);
+
+    // Create a provider with the HTTP transport.
+    let provider = ProviderBuilder::new().connect_client(rpc_client);
+    let latest_blocks: Option<alloy_consensus::Block<OpTransactionSigned>> = nodes[0]
+        .inner
+        .provider()
+        .block(HashOrNumber::Number(0))
+        .expect("Failed to get latest blocks");
+
+    info!("Created provider with HTTP transport");
+
+    let res: PayloadId = provider
+        .raw_request(
+            Cow::Borrowed("engine_forkchoiceUpdatedV3"),
+            (
+                alloy_rpc_types_engine::ForkchoiceState {
+                    safe_block_hash: B256::ZERO,
+                    head_block_hash: latest_blocks.map(|b| b.hash_slow()).unwrap_or_default(),
+                    finalized_block_hash: B256::ZERO,
+                },
+                Some(OpPayloadAttributes {
+                    eip_1559_params: Some(B64::ZERO),
+                    payload_attributes: PayloadAttributes {
+                        timestamp: payload_attributes.timestamp(),
+                        prev_randao: payload_attributes.prev_randao(),
+                        parent_beacon_block_root: payload_attributes.parent_beacon_block_root(),
+                        withdrawals: Some(payload_attributes.withdrawals().to_vec()),
+                        suggested_fee_recipient: payload_attributes.suggested_fee_recipient(),
+                    },
+                    transactions: payload_attributes
+                        .transactions
+                        .iter()
+                        .map(|tx| tx.clone().into_encoded_bytes().into())
+                        .collect(),
+                    no_tx_pool: Some(payload_attributes.no_tx_pool.clone()),
+                    gas_limit: payload_attributes.gas_limit.clone(),
+                }),
+            ),
+        )
+        .await
+        .expect("Failed to call RPC");
+
+    info!("Received response: {:?}", res);
+
+    tokio::time::sleep(Duration::from_secs(2)).await;
+
+    let payload: op_alloy_rpc_types_engine::OpExecutionPayloadEnvelopeV3 = provider
+        .raw_request(Cow::Borrowed("engine_getPayloadV3"), res)
+        .await
+        .expect("Failed to get payload");
+
+    info!("Received payload: {:?}", payload);
 
     Ok(())
 }

@@ -1,7 +1,7 @@
 //! A Tower service used as a RPC middleware on the [`OpEngineApiExt`] to extract
 //! [`Authorization`] from rollup-boost on ForkChoiceState updates, and notify the jobs generator.
 
-use std::{future::Future, task::Poll};
+use std::task::Poll;
 
 use alloy_rlp::Decodable;
 use jsonrpsee::{
@@ -11,17 +11,17 @@ use jsonrpsee::{
 use rollup_boost::Authorization;
 use tokio::sync::watch::Sender;
 use tower::{Layer, Service};
-use tracing::warn;
+use tracing::{error, info, warn};
 
-const FLASHBLOCKS_AUTHORIZATION_HEADER: &str = "flashblocks-authorization";
+pub const FLASHBLOCKS_AUTHORIZATION_HEADER: &str = "flashblocks-authorization";
 
 #[derive(Debug, Clone)]
 pub struct AuthorizationLayer {
-    to_jobs_generator: Sender<Authorization>,
+    to_jobs_generator: Sender<Option<Authorization>>,
 }
 
 impl AuthorizationLayer {
-    pub fn new(to_jobs_generator: Sender<Authorization>) -> Self {
+    pub fn new(to_jobs_generator: Sender<Option<Authorization>>) -> Self {
         Self { to_jobs_generator }
     }
 }
@@ -37,11 +37,11 @@ impl<S> Layer<S> for AuthorizationLayer {
 #[derive(Debug, Clone)]
 pub struct AuthorizationService<S> {
     inner: S,
-    to_jobs_generator: Sender<Authorization>,
+    to_jobs_generator: Sender<Option<Authorization>>,
 }
 
 impl<S> AuthorizationService<S> {
-    pub fn new(inner: S, to_jobs_generator: Sender<Authorization>) -> Self {
+    pub fn new(inner: S, to_jobs_generator: Sender<Option<Authorization>>) -> Self {
         Self {
             inner,
             to_jobs_generator,
@@ -69,9 +69,16 @@ where
     fn call(&mut self, req: HttpRequest) -> Self::Future {
         let headers = req.headers();
         if let Some(h) = headers.get(FLASHBLOCKS_AUTHORIZATION_HEADER) {
-            match Authorization::decode(&mut h.as_bytes()) {
+            info!("Received flashblocks authorization header: {:?}", h);
+
+            match Authorization::decode(&mut base64::decode(h.as_bytes()).map_err(|e| {
+                warn!(target: "rpc_middleware", "Failed to decode flashblocks authorization header: {e}");
+            }).inspect_err(|_| {
+                error!(target: "rpc_middleware", "Failed to decode flashblocks authorization header");
+             }).expect("Failed to decode flashblocks authorization header").as_ref()) {
                 Ok(auth) => {
-                    self.to_jobs_generator.send_replace(auth);
+                    info!(target: "rpc_middleware", "Decoded flashblocks authorization: {:?}", auth);
+                    self.to_jobs_generator.send(Some(auth)).expect("Failed to send authorization");
                 }
                 Err(e) => {
                     warn!(target: "rpc_middleware", "Failed to decode flashblocks authorization header: {e}");

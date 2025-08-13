@@ -9,7 +9,8 @@ use reth::builder::Node;
 use reth::builder::{EngineNodeLauncher, NodeBuilder, NodeConfig, NodeHandle};
 use reth::tasks::TaskManager;
 use reth_e2e_test_utils::node::NodeTestContext;
-use reth_e2e_test_utils::{NodeHelperType, TmpDB};
+use reth_e2e_test_utils::{Adapter, TmpDB};
+use reth_node_api::FullNodeTypesAdapter;
 use reth_node_core::args::RpcServerArgs;
 use reth_optimism_chainspec::{OpChainSpec, OpChainSpecBuilder};
 use reth_optimism_node::utils::optimism_payload_attributes;
@@ -34,8 +35,16 @@ use crate::test_utils::{raw_pbh_bundle_bytes, tx};
 
 mod flashblocks;
 
-pub(crate) type WorldChainNode<N> =
-    NodeHelperType<N, BlockchainProvider<NodeTypesWithDBAdapter<N, TmpDB>>>;
+pub(crate) type WorldChainNode<
+    N,
+    Provider = BlockchainProvider<NodeTypesWithDBAdapter<N, TmpDB>>,
+    AddOns = <N as Node<TmpNodeAdapter<N, Provider>>>::AddOns,
+> = NodeHelperType<N, Provider, AddOns>;
+
+pub type NodeHelperType<N, Provider, AddOns> = NodeTestContext<Adapter<N, Provider>, AddOns>;
+
+pub type TmpNodeAdapter<N, Provider = BlockchainProvider<NodeTypesWithDBAdapter<N, TmpDB>>> =
+    FullNodeTypesAdapter<N, TmpDB, Provider>;
 
 pub const BASE_CHAIN_ID: u64 = 8453;
 
