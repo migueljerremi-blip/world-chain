@@ -428,7 +428,7 @@ where
             .build();
 
         // 2. Create the block builder
-        let mut builder = self.block_builder(&mut state, best.as_ref(), ctx)?;
+        let mut builder = self.block_builder(&mut state, vec![], vec![], None, ctx)?;
 
         // 3. Execute Deposit transactions
         let info = ctx
@@ -503,56 +503,47 @@ where
         }
     }
 
-    pub fn block_builder<N, Ctx, DB, Tx, R, F, Builder, BB, I>(
+    pub fn block_builder<Ctx, DB, N, Tx>(
         &self,
         db: &'a mut State<DB>,
-        best: Option<&FlashblockBuiltPayload<N>>,
+        transactions: Vec<Recovered<N::SignedTx>>,
+        receipts: Vec<N::Receipt>,
+        cumulative_gas_used: Option<u64>,
         ctx: &'a Ctx,
-    ) -> Result<BB, PayloadBuilderError>
+    ) -> Result<
+        FlashblocksBlockBuilder<'a, N, OpEvm<&'a mut State<DB>, NoOpInspector, PrecompilesMap>>,
+        PayloadBuilderError,
+    >
     where
-        I: Inspector<<F::EvmFactory as EvmFactory>::Context<&'a mut State<DB>>>,
-        R: OpReceiptBuilder<Transaction = N::SignedTx, Receipt = N::Receipt>,
-        N: NodePrimitives<Block = OpBlock, SignedTx = OpTxEnvelope, Receipt = OpReceipt>,
-        Tx: PoolTransaction<Consensus = N::SignedTx> + OpPooledTx,
-        F: BlockExecutorFactory<
-            Transaction = N::SignedTx,
-            Receipt = N::Receipt,
-            EvmFactory: EvmFactory<
-                Spec = OpChainSpec,
-                Tx: FromRecoveredTx<op_alloy_consensus::OpTxEnvelope>
-                        + FromTxWithEncoded<op_alloy_consensus::OpTxEnvelope>,
-                HaltReason = OpHaltReason,
-            >,
+        Tx: PoolTransaction<Consensus = OpTransactionSigned> + OpPooledTx,
+        N: NodePrimitives<
+            Block = alloy_consensus::Block<OpTransactionSigned>,
+            BlockHeader = alloy_consensus::Header,
+            Receipt = OpReceipt,
         >,
-        BB: BlockBuilder<
-            Primitives = N,
-            Executor = FlashblocksBlockExecutor<
-                <<F as BlockExecutorFactory>::EvmFactory as EvmFactory>::Evm<
-                    &'a mut revm::database::State<DB>,
-                    I,
-                >,
-                R,
-            >,
-        >,
-        DB: revm::Database + Debug + 'a,
+        DB: reth_evm::Database + 'a,
         DB::Error: Send + Sync + 'static,
-        Ctx: PayloadBuilderCtx<
-            Evm = OpEvmConfig,
-            Transaction = Tx,
-            ChainSpec: OpHardforks + EthChainSpec,
-        >,
+        Ctx: PayloadBuilderCtx<Evm = OpEvmConfig, Transaction = Tx, ChainSpec = OpChainSpec>,
     {
-
-        
-        let config = if let Some(FlashblockBuiltPayload {
-            payload,
-            block_index,
-            ..
-        }) = best
-        {
-            BlockBuilderConfig::new(payload, block_index + 1)
-        } else {
-            BlockBuilderConfig::default()
+        let attributes = OpNextBlockEnvAttributes {
+            timestamp: ctx.attributes().timestamp(),
+            suggested_fee_recipient: ctx.attributes().suggested_fee_recipient(),
+            prev_randao: ctx.attributes().prev_randao(),
+            gas_limit: ctx.attributes().gas_limit.unwrap_or(ctx.parent().gas_limit),
+            parent_beacon_block_root: ctx.attributes().parent_beacon_block_root(),
+            extra_data: if ctx
+                .spec()
+                .is_holocene_active_at_timestamp(ctx.attributes().timestamp())
+            {
+                ctx.attributes()
+                    .get_holocene_extra_data(
+                        ctx.spec()
+                            .base_fee_params_at_timestamp(ctx.attributes().timestamp()),
+                    )
+                    .map_err(PayloadBuilderError::other)?
+            } else {
+                Default::default()
+            },
         };
 
         // Prepare EVM environment.
@@ -569,30 +560,23 @@ where
             .evm_config()
             .context_for_next_block(ctx.parent(), attributes);
 
-        let ExecutionOutcome {
-            bundle,
-            receipts,
-            requests: _,
-            first_block,
-        } = config.executed_block;
-
-        let receipts = receipts.iter().flatten().cloned().collect::<Vec<_>>();
-
-        let executor = FlashblocksBlockExecutor::new(
+        let mut executor = FlashblocksBlockExecutor::new(
             evm,
             execution_ctx.clone(),
             ctx.spec().clone(),
             OpRethReceiptBuilder::default(),
         )
-        .with_receipts(receipts)
-        .with_gas_used(config.gas_used)
-        .with_bundle_prestate(bundle);
+        .with_receipts(receipts);
+
+        if let Some(cumulative_gas_used) = cumulative_gas_used {
+            executor = executor.with_gas_used(cumulative_gas_used)
+        }
 
         Ok(FlashblocksBlockBuilder::new(
             execution_ctx,
             ctx.parent(),
             executor,
-            config.transactions,
+            transactions,
             Arc::new(ctx.spec().clone()),
         ))
     }
